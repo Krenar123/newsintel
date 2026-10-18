@@ -1,0 +1,54 @@
+version: 1
+cases:
+  - id: mk_explicit_accusation
+    title: "Филипче го обвини Мицкоски за злоупотреба"
+    content: "Венко Филипче го обвини Христијан Мицкоски за злоупотреба на службената положба."
+    target: "Христијан Мицкоски"
+    aliases: ["Мицкоски"]
+    candidates: ["Венко Филипче", "Христијан Мицкоски"]
+    expected_attacker: "Венко Филипче"
+    expected_category: "corruption"
+
+  - id: mk_quote
+    title: "СДСМ бара оставка од Мицкоски"
+    content: "СДСМ го критикува Христијан Мицкоски и порача: „Ова е политички неуспех за кој мора да има одговорност.“"
+    target: "Христијан Мицкоски"
+    aliases: ["Мицкоски"]
+    candidates: ["СДСМ", "Христијан Мицкоски"]
+    expected_attacker: "СДСМ"
+    expected_category: "competence"
+    expect_quote: true
+
+  - id: sq_explicit_accusation
+    title: "BDI akuzon Kasamin për nepotizëm"
+    content: "BDI akuzon Bilall Kasamin për nepotizëm dhe konflikt interesi në komunë."
+    target: "Билал Касами"
+    aliases: ["Bilall Kasami", "Kasami"]
+    candidates: ["ДУИ", "BDI", "Билал Касами"]
+    expected_attacker: "BDI"
+    expected_category: "ethics_nepotism"
+
+  - id: en_explicit_criticism
+    title: "Opposition criticizes the prime minister"
+    content: "SDSM criticized Hristijan Mickoski over what it called a failure of government policy."
+    target: "Христијан Мицкоски"
+    aliases: ["Hristijan Mickoski", "Mickoski"]
+    candidates: ["SDSM", "Христијан Мицкоски"]
+    expected_attacker: "SDSM"
+    expected_category: "competence"
+
+  - id: unrelated_crime_not_attack
+    title: "Мицкоски присуствуваше на настан"
+    content: "Христијан Мицкоски присуствуваше на настан. Во друг дел од вестите полицијата отвори истрага за кражба."
+    target: "Христијан Мицкоски"
+    aliases: ["Мицкоски"]
+    candidates: ["Христијан Мицкоски", "МВР"]
+    expect_attack: false
+
+  - id: neutral_mention_not_attack
+    title: "Средба во Владата"
+    content: "Христијан Мицкоски се сретна со претставници на стопанските комори."
+    target: "Христијан Мицкоски"
+    aliases: ["Мицкоски"]
+    candidates: ["Христијан Мицкоски", "Влада на Република Северна Македонија"]
+    expect_attack: false

@@ -1,0 +1,1062 @@
+# North Macedonia — Pilot Country Configuration
+# Add/remove sources as needed. Each source should have at least one RSS feed.
+
+name: "North Macedonia"
+code: "mk"
+languages: ["mk", "en", "sq"]
+timezone: "Europe/Skopje"
+flag_emoji: "🇲🇰"
+
+# Shared extraction defaults for Albanian-language WordPress-style portals.
+# Source-specific listing and URL rules are defined on each source below.
+x_albanian_scraper_defaults: &albanian_scraper_defaults
+  enabled: true
+  article_link_selectors:
+    - "article a[href]"
+    - "h1 a[href]"
+    - "h2 a[href]"
+    - "h3 a[href]"
+    - "a[href]"
+  exclude_url_patterns:
+    - "/category/"
+    - "/kategoria/"
+    - "/tag/"
+    - "/author/"
+    - "/page/"
+    - "/wp-content/"
+    - "/wp-json/"
+    - "/feed/"
+    - "/comments/"
+    - "/kontakt"
+    - "/contact"
+    - "/marketing"
+    - "/privacy"
+    - "/login"
+    - "/register"
+  selectors:
+    title: "h1, meta[property='og:title']"
+    body: ".entry-content, .td-post-content, .single-post-content, .post-content, .post-body, article"
+    date: "meta[property='article:published_time'], time, .entry-date, .post-date"
+    author: ".author-name, .author, .byline, [rel='author']"
+    image: "meta[property='og:image']"
+  min_word_count: 40
+  min_unique_words: 25
+
+sources:
+  # --- Macedonian Language Sources ---
+  - name: "MKD.mk"
+    url: "https://mkd.mk"
+    rss_feeds:
+      - url: "https://mkd.mk/rss"
+        category: "general"
+    language: "mk"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.8
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://mkd.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://mkd\\.mk/.+"
+      exclude_url_patterns:
+        - "/tag/"
+        - "/category/"
+        - "/author/"
+        - "/impresum"
+        - "/kontakt"
+      selectors:
+        title: "h1"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "360 Stepeni"
+    url: "https://360stepeni.mk"
+    rss_feeds:
+      - url: "https://360stepeni.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.85
+    scraper:
+      enabled: true
+      archive:
+        enabled: true
+        method: "wordpress_api"
+        endpoint: "https://360stepeni.mk/wp-json/wp/v2/posts"
+      listing_urls:
+        - "https://360stepeni.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://360stepeni\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/kategorija/"
+        - "/tag/"
+        - "/author/"
+        - "/team"
+        - "/impressum"
+        - "/marketing"
+        - "/ureduvachka-politika"
+      selectors:
+        title: "meta[property='og:title']"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 20
+
+  - name: "A1on"
+    url: "https://a1on.mk"
+    rss_feeds:
+      - url: "https://a1on.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.75
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://a1on.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://a1on\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/shto-e-prizma"
+        - "/kontakt"
+        - "/kolumni/"
+        - "/kolumni$"
+        - "/blog"
+      selectors:
+        title: "h1"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "Sloboden Pechat"
+    url: "https://www.slobodenpecat.mk"
+    rss_feeds:
+      - url: "https://www.slobodenpecat.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.7
+    scraper:
+      enabled: true
+      archive:
+        enabled: true
+        method: "wordpress_api"
+        endpoint: "https://www.slobodenpecat.mk/wp-json/wp/v2/posts"
+      listing_urls:
+        - "https://www.slobodenpecat.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://(www\\.)?slobodenpecat\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/shto-e-prizma"
+        - "/kontakt"
+        - "/kolumni/"
+        - "/blog"
+      selectors:
+        title: "h1.post-main-title"
+        body: ".post-body-inner"
+        date: "meta[property='article:published_time'], time"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "Fokus"
+    url: "https://fokus.mk"
+    rss_feeds:
+      - url: "https://fokus.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.7
+    scraper:
+      enabled: false
+      note: "Homepage currently returns 403 to scripted scraping; RSS remains active."
+      listing_urls:
+        - "https://fokus.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://fokus\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+      selectors:
+        title: "h1"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "Meta.mk"
+    url: "https://meta.mk"
+    rss_feeds:
+      - url: "https://meta.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.8
+    scraper:
+      enabled: true
+      archive:
+        enabled: true
+        method: "wordpress_api"
+        endpoint: "https://meta.mk/wp-json/wp/v2/posts"
+      listing_urls:
+        - "https://meta.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://meta\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+      selectors:
+        title: "h1"
+        body: "article, .entry-content, .post-content"
+        date: "meta[property='article:published_time'], meta[name='date'], time.entry-date, .post-date, time"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "SDK"
+    url: "https://sdk.mk"
+    rss_feeds: []
+    rss_enabled: false
+    language: "mk"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.8
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://sdk.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+        - "a[href]"
+      include_url_patterns:
+        - "^https://sdk\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/kontakt"
+        - "/marketing"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, .entry-content, .post-content, .single-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "Makfax"
+    url: "https://makfax.com.mk"
+    rss_feeds:
+      - url: "https://makfax.com.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "wire"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.8
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://makfax.com.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+        - "a[href]"
+      include_url_patterns:
+        - "^https://makfax\\.com\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/marketing"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "#mvp-content-main, .entry-content, .post-content, .single-content, article"
+        date: "time[itemprop='datePublished'], meta[property='article:published_time'], time"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "Portalb"
+    url: "https://portalb.mk"
+    rss_feeds:
+      - url: "https://portalb.mk/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Metamorphosis"
+    reliability_score: 0.8
+    scraper:
+      enabled: true
+      archive:
+        enabled: true
+        method: "wordpress_api"
+        endpoint: "https://portalb.mk/wp-json/wp/v2/posts"
+      listing_urls:
+        - "https://portalb.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://portalb\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/dneven-horoskop"
+        - "/tv-novela"
+        - "/naskoro"
+        - "/epizoda"
+        - "/sabota-[0-9]"
+        - "/nedela-[0-9]"
+        - "/petok-[0-9]"
+        - "/sreda-[0-9]"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+      bad_title_patterns:
+        - "дневен хороскоп"
+        - "тв новела"
+        - "наскоро"
+        - "прва епизода"
+        - "сабота [0-9]"
+        - "недела [0-9]"
+        - "петок [0-9]"
+        - "среда [0-9]"
+
+  - name: "Zhurnal"
+    url: "https://www.zhurnal.mk"
+    rss_feeds:
+      - url: "https://www.zhurnal.mk/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.65
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://www.zhurnal.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+        - "a[href]"
+      include_url_patterns:
+        - "^https://(www\\.)?zhurnal\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, .entry-content, .post-content, .single-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  # --- Additional Albanian Language Sources ---
+  - name: "Tetova Sot"
+    url: "https://tetovasot.com"
+    rss_feeds:
+      - url: "https://tetovasot.com/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Tetova Sot"
+    reliability_score: 0.6
+    note: "Initial source score; editorial/reliability review required. Strong Tetovo and Polog coverage."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://tetovasot.com"
+        - "https://tetovasot.com/category/top-lajm/"
+      include_url_patterns:
+        - "^https://(www\\.)?tetovasot\\.com/[0-9]{4}/[0-9]{2}/.+"
+
+  - name: "Gazeta Lajm"
+    url: "https://lajmpress.org"
+    rss_feeds:
+      - url: "https://lajmpress.org/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Gazeta Lajm"
+    reliability_score: 0.65
+    note: "Initial source score; editorial/reliability review required."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://lajmpress.org"
+        - "https://lajmpress.org/category/maqedoni/"
+      include_url_patterns:
+        - "^https://lajmpress\\.org/.+"
+
+  - name: "Almakos"
+    url: "https://almakos.com"
+    rss_feeds:
+      - url: "https://almakos.com/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Almakos"
+    reliability_score: 0.6
+    note: "Initial source score; editorial/reliability review required."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://almakos.com"
+        - "https://almakos.com/kategoria/maqedoni/"
+      include_url_patterns:
+        - "^https://almakos\\.com/.+"
+      preflight_min_average_words: 70
+
+  - name: "INA Online"
+    url: "https://ina-online.net"
+    rss_feeds:
+      - url: "https://ina-online.net/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Iliria News Agency"
+    reliability_score: 0.6
+    note: "Initial source score; editorial/reliability review required."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://ina-online.net"
+        - "https://ina-online.net/category/maqedoni/"
+      include_url_patterns:
+        - "^https://ina-online\\.net/.+"
+      preflight_min_average_words: 70
+
+  - name: "Koha"
+    url: "https://koha.mk"
+    rss_feeds:
+      - url: "https://koha.mk/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Koha"
+    reliability_score: 0.7
+    note: "Initial source score; editorial/reliability review required. Newspaper and online portal."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://koha.mk"
+      include_url_patterns:
+        - "^https://(www\\.)?koha\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/page/"
+        - "/wp-content/"
+        - "/feed/"
+        - "\\.pdf$"
+
+  - name: "Flaka"
+    url: "https://flaka.com.mk"
+    rss_feeds:
+      - url: "https://flaka.com.mk/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Flaka"
+    reliability_score: 0.6
+    note: "Initial source score; editorial/reliability review required."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://flaka.com.mk"
+      include_url_patterns:
+        - "^https://flaka\\.com\\.mk/.+"
+
+  - name: "Top24"
+    url: "https://top24.mk"
+    rss_feeds:
+      - url: "https://top24.mk/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Top24"
+    reliability_score: 0.55
+    note: "Initial source score; editorial/reliability review required."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://top24.mk"
+      include_url_patterns:
+        - "^https://top24\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/page/"
+        - "/wp-content/"
+        - "/feed/"
+        - "/reklama/"
+
+  - name: "FOL"
+    url: "https://fol.mk"
+    rss_feeds:
+      - url: "https://fol.mk/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "FOL"
+    reliability_score: 0.55
+    note: "Initial source score; editorial/reliability review required. Strong Tetovo/local coverage."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://fol.mk"
+        - "https://fol.mk/category/lajme/"
+      include_url_patterns:
+        - "^https://fol\\.mk/.+"
+
+  - name: "E-Gazeta"
+    url: "https://egazeta.mk"
+    rss_feeds:
+      - url: "https://egazeta.mk/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "E-Gazeta"
+    reliability_score: 0.55
+    note: "Initial source score; editorial/reliability review required."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://egazeta.mk"
+      include_url_patterns:
+        - "^https://egazeta\\.mk/.+"
+
+  - name: "Nistori"
+    url: "https://nistori.com"
+    rss_feeds:
+      - url: "https://nistori.com/feed/"
+        category: "general"
+    language: "sq"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "Nistori"
+    reliability_score: 0.65
+    note: "Initial source score; editorial/reliability review required. Social, education and culture focus."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://nistori.com"
+      include_url_patterns:
+        - "^https://nistori\\.com/.+"
+
+  - name: "Lajme.mk"
+    url: "https://lajme.mk"
+    rss_feeds: []
+    rss_enabled: false
+    language: "sq"
+    source_type: "aggregator"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.45
+    note: "Aggregator/republication source. It may signal amplification but must not count as independent confirmation."
+    scraper:
+      <<: *albanian_scraper_defaults
+      listing_urls:
+        - "https://lajme.mk"
+      include_url_patterns:
+        - "^https://lajme\\.mk/.+"
+
+  - name: "Alsat"
+    url: "https://alsat.mk"
+    rss_feeds:
+      - url: "https://alsat.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "tv"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.75
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://alsat.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://alsat\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "TV21"
+    url: "https://mk.tv21.tv"
+    rss_feeds:
+      - url: "https://mk.tv21.tv/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "tv"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.75
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://mk.tv21.tv"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+        - "a[href]"
+      include_url_patterns:
+        - "^https://mk\\.tv21\\.tv/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/dneven-horoskop"
+        - "/horoskop"
+        - "/tv-program"
+        - "/programa"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+      bad_title_patterns:
+        - "дневен хороскоп"
+        - "хороскоп"
+
+  - name: "Telma"
+    url: "https://telma.com.mk"
+    rss_feeds:
+      - url: "https://telma.com.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "tv"
+    political_leaning: "unknown"
+    ownership: "unknown"
+    reliability_score: 0.8
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://telma.com.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://telma\\.com\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/dneven-horoskop"
+        - "/horoskop"
+        - "/tv-novela"
+        - "/naskoro"
+        - "/prva-epizoda"
+        - "/epizoda"
+        - "/sabota-[0-9]"
+        - "/nedela-[0-9]"
+        - "/ponedelnik-[0-9]"
+        - "/vtornik-[0-9]"
+        - "/sreda-[0-9]"
+        - "/chetvrtiok-[0-9]"
+        - "/cetvrtok-[0-9]"
+        - "/petok-[0-9]"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+      bad_title_patterns:
+        - "дневен хороскоп"
+        - "хороскоп"
+        - "тв новела"
+        - "наскоро"
+        - "прва епизода"
+        - "сабота [0-9]"
+        - "недела [0-9]"
+        - "понеделник [0-9]"
+        - "вторник [0-9]"
+        - "среда [0-9]"
+        - "четврток [0-9]"
+        - "петок [0-9]"
+
+  - name: "IRL"
+    url: "https://irl.mk"
+    rss_feeds: []
+    rss_enabled: false
+    language: "mk"
+    source_type: "investigative"
+    political_leaning: "unknown"
+    ownership: "IRL"
+    reliability_score: 0.9
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://irl.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://irl\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "Prizma"
+    url: "https://prizma.mk"
+    rss_feeds:
+      - url: "https://prizma.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "investigative"
+    political_leaning: "unknown"
+    ownership: "BIRN"
+    reliability_score: 0.9
+    scraper:
+      enabled: true
+      listing_urls:
+        - "https://prizma.mk"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+        - "a[href]"
+      include_url_patterns:
+        - "^https://prizma\\.mk/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/kategorija/"
+        - "/tag/"
+        - "/author/"
+        - "/shto-e-prizma"
+        - "/kontakt"
+        - "/kolumni/"
+        - "/kolumni$"
+        - "/blog"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  - name: "TIME.mk"
+    url: "https://time.mk"
+    rss_feeds: []
+    rss_enabled: false
+    is_active: false
+    language: "mk"
+    source_type: "aggregator"
+    political_leaning: "unknown"
+    ownership: "TIME.mk"
+    reliability_score: 0.65
+    note: "Use as an aggregator signal for story spread; original portals remain authoritative sources."
+    scraper:
+      enabled: false
+      note: "Disabled as article ingestion source for now; use later for story-spread clustering after a dedicated parser."
+      listing_urls:
+        - "https://time.mk/s/"
+      article_link_selectors:
+        - "a[href]"
+      include_url_patterns:
+        - "^https://time\\.mk/.+"
+      exclude_url_patterns:
+        - "/rss/"
+        - "/trajkovski/"
+      selectors:
+        title: "h1, meta[property='og:title']"
+        body: "article, main, body"
+        date: "time, meta[property='article:published_time']"
+        author: ""
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+  # --- English Language Sources ---
+  - name: "MIA"
+    url: "https://mia.mk"
+    rss_feeds:
+      - url: "https://mia.mk/feed/"
+        category: "general"
+    language: "mk"
+    source_type: "wire"
+    political_leaning: "government"
+    ownership: "state news agency"
+    reliability_score: 0.9
+    note: "Official state news agency"
+    scraper:
+      enabled: false
+      note: "Direct story pages can be subscriber-only; keep RSS active and add a dedicated MIA parser/access strategy later."
+      listing_urls:
+        - "https://mia.mk"
+      article_link_selectors:
+        - ".entry-title a[href]"
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://mia\\.mk/story/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+        - "/story/%D0%BE%D0%B4-%D0%B2%D0%B5%D1%80%D1%81%D0%BA%D0%B8%D1%82%D0%B5-%D0%BA%D0%B0%D0%BB%D0%B5%D0%BD%D0%B4%D0%B0%D1%80%D0%B8"
+        - "/story/%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%BD%D0%BE%D0%BC%D1%81%D0%BA%D0%B8-%D0%BA%D0%B0%D0%BB%D0%B5%D0%BD%D0%B4%D0%B0%D1%80"
+        - "/story/%D0%BC%D0%B8%D0%B0-%D0%BD%D0%B0%D1%98%D0%B0%D0%B2%D0%B8"
+      selectors:
+        title: "meta[property='og:title']"
+        body: ".entry-content, article, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 20
+      min_unique_words: 12
+      bad_title_patterns:
+        - "^Од верските календари$"
+        - "^Астрономски календар$"
+        - "^МИА Најави"
+      bad_content_patterns:
+        - "Веста е достапна само за претплатниците"
+        - "Логирајте се или контактирајте"
+
+  - name: "Balkan Insight - North Macedonia"
+    url: "https://balkaninsight.com/country/north-macedonia/"
+    rss_feeds:
+      - url: "https://balkaninsight.com/category/bi/macedonia/feed"
+        category: "general"
+    language: "en"
+    source_type: "news"
+    political_leaning: "unknown"
+    ownership: "BIRN"
+    reliability_score: 0.9
+    scraper:
+      enabled: false
+      note: "RSS is reliable; direct country listing currently exposes thin techresponses pages, so keep scraping disabled until a dedicated parser is added."
+      listing_urls:
+        - "https://balkaninsight.com/country/north-macedonia/"
+      article_link_selectors:
+        - "article a[href]"
+        - "h2 a[href]"
+        - "h3 a[href]"
+      include_url_patterns:
+        - "^https://balkaninsight\\.com/.+"
+      exclude_url_patterns:
+        - "/category/"
+        - "/tag/"
+        - "/author/"
+      selectors:
+        title: "h1"
+        body: "article, .entry-content, .post-content"
+        date: "time, meta[property='article:published_time']"
+        author: ".author, .byline"
+        image: "meta[property='og:image']"
+      min_word_count: 40
+
+facebook_pages:
+  # Add official Page IDs or handles after Meta app review/token setup.
+  # These are normalized into the same article/entity/sentiment pipeline.
+  - name: "Example Political Figure Page"
+    url: "https://www.facebook.com/example"
+    page_handle: "example"
+    enabled: false
+    language: "mk"
+    source_type: "social_media"
+    political_leaning: "unknown"
+    ownership: "official page"
+    reliability_score: 0.65
+    monitor_type: "political_figure"
+  - name: "Example Political Party Page"
+    url: "https://www.facebook.com/exampleparty"
+    page_handle: "exampleparty"
+    enabled: false
+    language: "mk"
+    source_type: "social_media"
+    political_leaning: "unknown"
+    ownership: "official page"
+    reliability_score: 0.7
+    monitor_type: "political_party"
+  - name: "Example Journalist Page"
+    url: "https://www.facebook.com/examplejournalist"
+    page_handle: "examplejournalist"
+    enabled: false
+    language: "mk"
+    source_type: "social_media"
+    political_leaning: "unknown"
+    ownership: "public page"
+    reliability_score: 0.55
+    monitor_type: "journalist"
+
+# Categories to track
+categories:
+  - politics
+  - economy
+  - society
+  - world
+  - sports
+  - tech
+  - culture
+  - crime
+  - health
+  - environment
+
+# Keywords for category classification (used by ML categorizer as seed data)
+category_keywords:
+  politics:
+    - "влада"      # government
+    - "парламент"  # parliament
+    - "избори"     # elections
+    - "партија"    # party
+    - "премиер"    # prime minister
+    - "претседател" # president
+    - "закон"      # law
+    - "ЕУ"         # EU
+    - "НАТО"       # NATO
+    - "government"
+    - "parliament"
+    - "election"
+    - "minister"
+  economy:
+    - "економија"  # economy
+    - "бизнис"     # business
+    - "инвестиции" # investments
+    - "буџет"      # budget
+    - "ММФ"        # IMF
+    - "инфлација"  # inflation
+    - "economy"
+    - "business"
+    - "investment"
+    - "GDP"
+  society:
+    - "образование" # education
+    - "здравство"   # healthcare
+    - "протест"     # protest
+    - "граѓани"     # citizens
+    - "education"
+    - "healthcare"
+    - "protest"
+  crime:
+    - "криминал"    # crime
+    - "полиција"    # police
+    - "апсење"     # arrest
+    - "судење"     # trial
+    - "crime"
+    - "police"
+    - "arrest"
+  sports:
+    - "фудбал"     # football
+    - "кошарка"    # basketball
+    - "спорт"      # sport
+    - "лига"       # league
+    - "football"
+    - "basketball"
+    - "sport"
+  tech:
+    - "технологија" # technology
+    - "дигитален"  # digital
+    - "апликација" # application
+    - "technology"
+    - "digital"
+    - "startup"

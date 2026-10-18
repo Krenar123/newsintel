@@ -1,0 +1,108 @@
+Here’s the clean way to test everything end-to-end on your machine.
+
+1. Backend Setup
+From C:\Users\User\Desktop\newsintel:
+
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe -m nltk.downloader -d .\venv\nltk_data punkt punkt_tab vader_lexicon
+.\venv\Scripts\python.exe scripts\setup_db.py --seed
+This creates/updates DB tables, seeds sources, and creates the admin user.
+
+Default login:
+
+Email: admin@newsintel.local
+Password: ChangeMe123!
+2. Frontend Setup
+
+cd frontend
+..\.tools\node-v24.14.1-win-x64\npm.cmd install
+.\build.ps1
+cd ..
+3. Start Backend
+
+.\venv\Scripts\python.exe -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+Backend health check:
+
+Invoke-WebRequest http://127.0.0.1:8000/health -UseBasicParsing
+4. Start Frontend
+Open a second PowerShell:
+
+cd C:\Users\User\Desktop\newsintel\frontend
+.\dev.ps1
+Open:
+
+http://127.0.0.1:5173
+Log in with the admin user above.
+
+5. Run Backend Smoke Tests
+In another PowerShell:
+
+.\venv\Scripts\python.exe -m compileall src scripts
+Test auth:
+
+.\venv\Scripts\python.exe -c "from fastapi.testclient import TestClient; from src.api.main import app; c=TestClient(app); r=c.post('/api/v1/auth/login', json={'email':'admin@newsintel.local','password':'ChangeMe123!'}); print(r.status_code, r.json()['user'])"
+Test protected admin endpoint:
+
+.\venv\Scripts\python.exe -c "from fastapi.testclient import TestClient; from src.api.main import app; c=TestClient(app); login=c.post('/api/v1/auth/login', json={'email':'admin@newsintel.local','password':'ChangeMe123!'}).json(); h={'Authorization':'Bearer '+login['access_token']}; print(c.get('/api/v1/admin/facebook/status', headers=h).json())"
+Test client dashboard:
+
+.\venv\Scripts\python.exe -c "from fastapi.testclient import TestClient; from src.api.main import app; c=TestClient(app); login=c.post('/api/v1/auth/login', json={'email':'admin@newsintel.local','password':'ChangeMe123!'}).json(); h={'Authorization':'Bearer '+login['access_token']}; r=c.get('/api/v1/clients/1/dashboard', headers=h); print(r.status_code, r.json()['metrics'])"
+6. Test Ingestion
+Run scraper + RSS ingestion:
+
+.\venv\Scripts\python.exe scripts\ingest.py --country mk --process --batch-size 50
+Then refresh the dashboard.
+
+7. Test Facebook
+Facebook storage/admin UI works now, but real fetching needs a Meta token.
+
+Add to .env:
+
+FACEBOOK_ACCESS_TOKEN=your_meta_token_here
+FACEBOOK_API_VERSION=v24.0
+MAX_FACEBOOK_POSTS_PER_PAGE=25
+Then in dashboard:
+
+Admin -> Add Public Page Monitor
+Admin -> Fetch Facebook Now
+Without token, it will safely show token missing and fetch 0 posts.
+
+8. Manual UI Test Checklist
+In browser:
+
+Log in as admin.
+Go to Admin.
+Add a Facebook page monitor.
+Create a client user.
+Go to Clients.
+Create a client.
+Add watchlist items:
+entity/opponent
+keyword
+source
+Facebook page
+Check:
+risk signals
+response pack
+attack timeline
+save case
+open case
+change case status
+attach evidence
+plan usage
+Go to Overview and check:
+narratives
+trends
+recent articles
+sources
+timeline
+9. Production-Like Full Test
+Run:
+
+.\venv\Scripts\python.exe scripts\setup_db.py --seed
+.\venv\Scripts\python.exe scripts\ingest.py --country mk --process --batch-size 100
+cd frontend
+.\build.ps1
+Then start backend/frontend and test the UI.
+
+The main things that still require external setup are the real Meta/Facebook API token and permissions. Everything else can be tested locally now.

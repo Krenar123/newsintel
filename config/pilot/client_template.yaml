@@ -1,0 +1,33 @@
+client:
+  name: "REPLACE WITH CLIENT OR ORGANIZATION NAME"
+  email: "replace@example.com"
+  client_type: "political_figure"
+  plan: "pro"
+  country_code: "mk"
+  language: "mk"
+  risk_tolerance: "balanced"
+  settings:
+    pilot: true
+    response_assistant_enabled: true
+    broad_research_enabled: false
+
+user:
+  email: "replace@example.com"
+  name: "REPLACE WITH USER NAME"
+
+watchlist:
+  - item_type: "entity"
+    label: "Primary monitored person"
+    value: "REPLACE WITH CANONICAL CYRILLIC NAME"
+    aliases:
+      - "REPLACE WITH LATIN ALIAS"
+    priority: 5
+    alert_enabled: true
+    response_assist_enabled: true
+  - item_type: "keyword"
+    label: "High-risk language"
+    value: "напад обвини скандал одговорност"
+    aliases: []
+    priority: 4
+    alert_enabled: true
+    response_assist_enabled: true

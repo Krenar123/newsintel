@@ -1,0 +1,133 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-newsintel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-newsintel}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-newsintel} -d ${POSTGRES_DB:-newsintel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers ${API_WORKERS:-2}
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+      TOKEN_EXPIRY_HOURS: ${TOKEN_EXPIRY_HOURS:-12}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:?SEED_ADMIN_EMAIL is required}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD is required}
+      DEFAULT_COUNTRY: ${DEFAULT_COUNTRY:-mk}
+      ENABLE_AI_SUMMARIES: ${ENABLE_AI_SUMMARIES:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-haiku-4-5-20251001}
+      ENABLE_AI_INTELLIGENCE: ${ENABLE_AI_INTELLIGENCE:-false}
+      AI_GROUNDING_REQUIRED: ${AI_GROUNDING_REQUIRED:-true}
+      INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-15}
+      STOP_AFTER_CONSECUTIVE_DUPLICATES: ${STOP_AFTER_CONSECUTIVE_DUPLICATES:-10}
+      MAX_ARTICLES_PER_FEED: ${MAX_ARTICLES_PER_FEED:-50}
+      SCRAPE_DELAY_SECONDS: ${SCRAPE_DELAY_SECONDS:-2}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SENDER_EMAIL: ${SENDER_EMAIL:-reports@yourdomain.com}
+      FACEBOOK_ACCESS_TOKEN: ${FACEBOOK_ACCESS_TOKEN:-}
+      FACEBOOK_API_VERSION: ${FACEBOOK_API_VERSION:-v24.0}
+      MAX_FACEBOOK_POSTS_PER_PAGE: ${MAX_FACEBOOK_POSTS_PER_PAGE:-25}
+    volumes:
+      - reports:/app/reports
+      - appdata:/app/data
+      - mlmodels:/app/ml_models
+    ports:
+      - "${API_PUBLIC_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: python scripts/scheduler.py --country ${DEFAULT_COUNTRY:-mk} ${SCHEDULER_NO_EMAIL:+--no-email}
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      DEFAULT_COUNTRY: ${DEFAULT_COUNTRY:-mk}
+      ENABLE_AI_SUMMARIES: ${ENABLE_AI_SUMMARIES:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-haiku-4-5-20251001}
+      ENABLE_AI_INTELLIGENCE: ${ENABLE_AI_INTELLIGENCE:-false}
+      AI_GROUNDING_REQUIRED: ${AI_GROUNDING_REQUIRED:-true}
+      INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-15}
+      STOP_AFTER_CONSECUTIVE_DUPLICATES: ${STOP_AFTER_CONSECUTIVE_DUPLICATES:-10}
+      MAX_ARTICLES_PER_FEED: ${MAX_ARTICLES_PER_FEED:-50}
+      SCRAPE_DELAY_SECONDS: ${SCRAPE_DELAY_SECONDS:-2}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SENDER_EMAIL: ${SENDER_EMAIL:-reports@yourdomain.com}
+      FACEBOOK_ACCESS_TOKEN: ${FACEBOOK_ACCESS_TOKEN:-}
+      FACEBOOK_API_VERSION: ${FACEBOOK_API_VERSION:-v24.0}
+      MAX_FACEBOOK_POSTS_PER_PAGE: ${MAX_FACEBOOK_POSTS_PER_PAGE:-25}
+    volumes:
+      - reports:/app/reports
+      - appdata:/app/data
+      - mlmodels:/app/ml_models
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PUBLIC_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health | grep ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  reports:
+  appdata:
+  mlmodels:

@@ -1,0 +1,76 @@
+country: mk
+default_date_to: "2026-12-31"
+default_max_per_source: 25
+subjects:
+  - key: hristijan_mickoski
+    name: "Христијан Мицкоски"
+    query: "Христијан Мицкоски"
+    type: person
+    from_year: 2017
+    aliases: ["Христијан Мицковски", "Hristijan Mickoski"]
+  - key: vmro_dpmne
+    name: "ВМРО-ДПМНЕ"
+    query: "ВМРО-ДПМНЕ"
+    type: party
+    from_year: 2010
+    aliases: ["VMRO-DPMNE", "ВМРО ДПМНЕ"]
+  - key: sdsm
+    name: "СДСМ"
+    query: "СДСМ"
+    type: party
+    from_year: 2010
+    aliases: ["SDSM"]
+  - key: dui
+    name: "ДУИ"
+    query: "ДУИ"
+    type: party
+    from_year: 2010
+    aliases: ["DUI", "Демократска унија за интеграција"]
+  - key: vlen
+    name: "ВЛЕН"
+    query: "ВЛЕН"
+    type: party
+    from_year: 2023
+    aliases: ["VLEN", "Вреди"]
+  - key: ali_ahmeti
+    name: "Али Ахмети"
+    query: "Али Ахмети"
+    type: person
+    from_year: 2010
+    aliases: ["Ali Ahmeti"]
+  - key: venko_filipche
+    name: "Венко Филипче"
+    query: "Венко Филипче"
+    type: person
+    from_year: 2017
+    aliases: ["Venko Filipce", "Венко Филипче"]
+  - key: zoran_zaev
+    name: "Зоран Заев"
+    query: "Зоран Заев"
+    type: person
+    from_year: 2010
+    aliases: ["Zoran Zaev"]
+  - key: nikola_gruevski
+    name: "Никола Груевски"
+    query: "Никола Груевски"
+    type: person
+    from_year: 2010
+    aliases: ["Nikola Gruevski"]
+  - key: dimitar_kovachevski
+    name: "Димитар Ковачевски"
+    query: "Димитар Ковачевски"
+    type: person
+    from_year: 2020
+    aliases: ["Dimitar Kovacevski"]
+  - key: gordana_siljanovska
+    name: "Гордана Сиљановска-Давкова"
+    query: "Гордана Сиљановска"
+    type: person
+    from_year: 2018
+    aliases: ["Gordana Siljanovska-Davkova"]
+  - key: stevo_pendarovski
+    name: "Стево Пендаровски"
+    query: "Стево Пендаровски"
+    type: person
+    from_year: 2014
+    aliases: ["Stevo Pendarovski"]

@@ -1,0 +1,192 @@
+version: 1
+description: Curated Macedonian and Albanian entity extraction acceptance set.
+cases:
+  - id: mk_leadership
+    language: mk
+    text: "Христијан Мицкоски се сретна со Гордана Силјановска-Давкова во Скопје."
+    expected:
+      - {name: "Христијан Мицкоски", type: person}
+      - {name: "Гордана Силјановска-Давкова", type: person}
+      - {name: "Скопје", type: location}
+
+  - id: opposition_leadership
+    language: mk
+    text: "Венко Филипче и Димитар Ковачевски присуствуваа на седницата на СДСМ."
+    expected:
+      - {name: "Венко Филипче", type: person}
+      - {name: "Димитар Ковачевски", type: person}
+      - {name: "СДСМ", type: organization}
+
+  - id: albanian_leaders_cyrillic
+    language: mk
+    text: "Али Ахмети, Бујар Османи и Африм Гаши разговараа во Собранието."
+    expected:
+      - {name: "Али Ахмети", type: person}
+      - {name: "Бујар Османи", type: person}
+      - {name: "Африм Гаши", type: person}
+      - {name: "Собрание на Република Северна Македонија", type: organization}
+
+  - id: coalition_aliases
+    language: mk
+    text: "Вреди и ВЛЕН се однесуваат на истата коалиција, а Движење Беса е нејзина членка."
+    expected:
+      - {name: "ВЛЕН", type: organization}
+      - {name: "Движење Беса", type: organization}
+
+  - id: party_aliases_latin
+    language: sq
+    text: "BDI dhe VLEN zhvilluan takim me Bilall Kasami dhe Izet Mexhiti në Tetovë."
+    expected:
+      - {name: "ДУИ", type: organization}
+      - {name: "ВЛЕН", type: organization}
+      - {name: "Билал Касами", type: person}
+      - {name: "Изет Меџити", type: person}
+      - {name: "Тетово", type: location}
+
+  - id: party_aliases_english
+    language: en
+    text: "VMRO-DPMNE, SDSM and DUI met representatives of the European Union in Skopje."
+    expected:
+      - {name: "ВМРО-ДПМНЕ", type: organization}
+      - {name: "СДСМ", type: organization}
+      - {name: "ДУИ", type: organization}
+      - {name: "Европска Унија", type: organization}
+      - {name: "Скопје", type: location}
+
+  - id: institutions_core
+    language: mk
+    text: "Владата, Собранието, МВР и МНР објавија заедничко соопштение."
+    expected:
+      - {name: "Влада на Република Северна Македонија", type: organization}
+      - {name: "Собрание на Република Северна Македонија", type: organization}
+      - {name: "МВР", type: organization}
+      - {name: "МНР", type: organization}
+
+  - id: institutions_justice
+    language: mk
+    text: "Уставниот суд и Јавното обвинителство побараа податоци од Министерството за правда."
+    expected:
+      - {name: "Уставен суд", type: organization}
+      - {name: "Јавно обвинителство", type: organization}
+      - {name: "Министерство за правда", type: organization}
+
+  - id: institutions_elections
+    language: mk
+    text: "ДИК и ДКСК ќе соработуваат со Државниот завод за статистика."
+    expected:
+      - {name: "Државна изборна комисија", type: organization}
+      - {name: "Државна комисија за спречување на корупцијата", type: organization}
+      - {name: "Државен завод за статистика", type: organization}
+
+  - id: political_figures_latin
+    language: en
+    text: "Hristijan Mickoski spoke with Ali Ahmeti, Arben Taravari and Bujar Osmani."
+    expected:
+      - {name: "Христијан Мицкоски", type: person}
+      - {name: "Али Ахмети", type: person}
+      - {name: "Арбен Таравари", type: person}
+      - {name: "Бујар Османи", type: person}
+
+  - id: regional_locations
+    language: mk
+    text: "Делегациите од Северна Македонија, Албанија, Србија, Косово и Грција се сретнаа во Охрид."
+    expected:
+      - {name: "Северна Македонија", type: location}
+      - {name: "Албанија", type: location}
+      - {name: "Србија", type: location}
+      - {name: "Косово", type: location}
+      - {name: "Грција", type: location}
+      - {name: "Охрид", type: location}
+
+  - id: generic_words_are_not_entities
+    language: mk
+    text: "Според најавата, наместо вчера средбата ќе се одржи утре, а земјата очекува уште информации."
+    expected: []
+    forbidden:
+      - "Според"
+      - "наместо"
+      - "вчера"
+      - "утре"
+      - "земјата"
+      - "уште"
+
+  - id: generic_political_roles_are_not_entities
+    language: mk
+    text: "Партијата соопшти дека премиерот, министерот и претседателот ќе одговорат пред јавноста."
+    expected: []
+    forbidden:
+      - "Партијата"
+      - "премиерот"
+      - "министерот"
+      - "претседателот"
+      - "јавноста"
+
+  - id: article_fragments_are_not_entities
+    language: mk
+    text: "Изборниот законик Последните измени се поврзани со постапката, затоа што рокот истекува денес."
+    expected: []
+    forbidden:
+      - "Изборниот законик Последните"
+      - "поврзани"
+      - "затоа што"
+      - "денес"
+
+  - id: social_widgets_are_not_entities
+    language: sq
+    text: "Facebook X WhatsApp Telegram Viber Pinterest share video foto."
+    expected: []
+    forbidden:
+      - "Facebook X WhatsApp"
+      - "Telegram Viber Pinterest"
+
+  - id: dates_are_not_entities
+    language: mk
+    text: "На 15.07.2026 и на 16/07/2026 беа објавени две соопштенија."
+    expected: []
+
+  - id: real_entity_with_noise
+    language: mk
+    text: "Според МВР, Христијан Мицкоски денес беше во Битола, а поврзани вести ќе следат."
+    expected:
+      - {name: "МВР", type: organization}
+      - {name: "Христијан Мицкоски", type: person}
+      - {name: "Битола", type: location}
+    forbidden:
+      - "Според"
+      - "денес"
+      - "поврзани"
+
+  - id: less_common_figures
+    language: mk
+    text: "Максим Димитриевски разговараше со Димитар Апасиев и Стево Пендаровски во Куманово."
+    expected:
+      - {name: "Максим Димитриевски", type: person}
+      - {name: "Димитар Апасиев", type: person}
+      - {name: "Стево Пендаровски", type: person}
+      - {name: "Куманово", type: location}
+
+  - id: ministries
+    language: mk
+    text: "Министерството за финансии и Министерството за здравство доставија извештаи до Народната банка."
+    expected:
+      - {name: "Министерство за финансии", type: organization}
+      - {name: "Министерство за здравство", type: organization}
+      - {name: "Народна банка", type: organization}
+
+  - id: international_organizations
+    language: en
+    text: "NATO and the European Union discussed North Macedonia in Brussels and Washington."
+    expected:
+      - {name: "НАТО", type: organization}
+      - {name: "Европска Унија", type: organization}
+      - {name: "Северна Македонија", type: location}
+      - {name: "Брисел", type: location}
+      - {name: "Вашингтон", type: location}
+
+  - id: albanian_regional_initiative
+    language: sq
+    text: "Ballkanin e Hapur u diskutua në Maqedoninë e Veriut dhe në Shkup."
+    expected:
+      - {name: "Отворен Балкан", type: organization}
+      - {name: "Северна Македонија", type: location}
+      - {name: "Скопје", type: location}

@@ -1,0 +1,90 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: newsintel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-newsintel_dev_change_me}
+      POSTGRES_DB: newsintel
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsintel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── NewsIntel API ────────────────────────────────────────────────
+  api:
+    build: .
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://newsintel:${POSTGRES_PASSWORD:-newsintel_dev_change_me}@db:5432/newsintel}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      TOKEN_EXPIRY_HOURS: ${TOKEN_EXPIRY_HOURS:-12}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@newsintel.local}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-ChangeMe123!}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-haiku-4-5-20251001}
+      ENABLE_AI_INTELLIGENCE: ${ENABLE_AI_INTELLIGENCE:-false}
+      AI_GROUNDING_REQUIRED: ${AI_GROUNDING_REQUIRED:-true}
+      ENABLE_AI_SUMMARIES: ${ENABLE_AI_SUMMARIES:-false}
+      INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-15}
+      STOP_AFTER_CONSECUTIVE_DUPLICATES: ${STOP_AFTER_CONSECUTIVE_DUPLICATES:-10}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SENDER_EMAIL: ${SENDER_EMAIL:-reports@yourdomain.com}
+    volumes:
+      - .:/app
+      - reports:/app/reports
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Scheduled Ingestion Worker ───────────────────────────────────
+  worker:
+    build: .
+    command: >
+      sh -c "
+        echo 'Starting ingestion worker...' &&
+        while true; do
+          python scripts/ingest.py --country mk --process
+          echo 'Sleeping for ${INGESTION_INTERVAL_MINUTES:-15} minutes...'
+          sleep $((${INGESTION_INTERVAL_MINUTES:-15} * 60))
+        done
+      "
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://newsintel:${POSTGRES_PASSWORD:-newsintel_dev_change_me}@db:5432/newsintel}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-haiku-4-5-20251001}
+      ENABLE_AI_INTELLIGENCE: ${ENABLE_AI_INTELLIGENCE:-false}
+      AI_GROUNDING_REQUIRED: ${AI_GROUNDING_REQUIRED:-true}
+      ENABLE_AI_SUMMARIES: ${ENABLE_AI_SUMMARIES:-false}
+      INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-15}
+      STOP_AFTER_CONSECUTIVE_DUPLICATES: ${STOP_AFTER_CONSECUTIVE_DUPLICATES:-10}
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  reports:

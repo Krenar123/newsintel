@@ -1,0 +1,392 @@
+country_code: mk
+entities:
+- name: Гордана Силјановска-Давкова
+  type: person
+  aliases:
+  - Силјановска-Давкова
+  - Гордана Силјановска
+  - Gordana Siljanovska-Davkova
+  - Siljanovska-Davkova
+- name: Христијан Мицкоски
+  type: person
+  aliases:
+  - Мицкоски
+  - Hristijan Mickoski
+  - Hristijan Mickovski
+  - Mickoski
+  - Mickovski
+- name: Димитар Ковачевски
+  type: person
+  aliases:
+  - Ковачевски
+  - Dimitar Kovachevski
+  - Kovachevski
+- name: Зоран Заев
+  type: person
+  aliases:
+  - Заев
+  - Zoran Zaev
+  - Zaev
+- name: Али Ахмети
+  type: person
+  aliases:
+  - Ахмети
+  - Ali Ahmeti
+  - Ahmeti
+- name: Африм Гаши
+  type: person
+  aliases:
+  - Гаши
+  - Afrim Gashi
+  - Gashi
+- name: Бујар Османи
+  type: person
+  aliases:
+  - Османи
+  - Bujar Osmani
+  - Osmani
+- name: Оливер Спасовски
+  type: person
+  aliases:
+  - Спасовски
+  - Oliver Spasovski
+  - Spasovski
+- name: ВМРО-ДПМНЕ
+  type: organization
+  aliases:
+  - ВМРО ДПМНЕ
+  - ВМРО
+  - Внатрешна македонска револуционерна организација
+  - VMRO-DPMNE
+  - VMRO DPMNE
+- name: СДСМ
+  type: organization
+  aliases:
+  - Социјалдемократски сојуз
+  - Социјалдемократски сојуз на Македонија
+  - SDSM
+- name: ДУИ
+  type: organization
+  aliases:
+  - Демократска унија за интеграција
+  - DUI
+  - BDI
+  - Bashkimi Demokratik për Integrim
+  - Bashkimi Demokratik per Integrim
+- name: Левица
+  type: organization
+  aliases:
+  - Levica
+- name: ЗНАМ
+  type: organization
+  aliases:
+  - ZNAM
+- name: Алијанса за Албанците
+  type: organization
+- name: Собрание на Република Северна Македонија
+  type: organization
+  aliases:
+  - Собранието
+  - Собрание
+- name: Влада на Република Северна Македонија
+  type: organization
+  aliases:
+  - Владата
+  - Влада
+- name: МВР
+  type: organization
+  aliases:
+  - Министерство за внатрешни работи
+- name: МНР
+  type: organization
+  aliases:
+  - Министерство за надворешни работи
+- name: Северна Македонија
+  type: location
+  aliases:
+  - Македонија
+  - РСМ
+  - North Macedonia
+  - Republic of North Macedonia
+  - Maqedonia e Veriut
+  - Maqedoninë e Veriut
+  - Maqedonisë së Veriut
+- name: САД
+  type: location
+  aliases:
+  - Америка
+  - Соединети Американски Држави
+  - SHBA
+- name: НАТО
+  type: organization
+  aliases:
+  - NATO
+- name: Скопје
+  type: location
+  aliases:
+  - Skopje
+  - Shkup
+  - Shkupi
+- name: Охрид
+  type: location
+  aliases:
+  - Ohrid
+- name: Битола
+  type: location
+  aliases:
+  - Bitola
+- name: Тетово
+  type: location
+  aliases:
+  - Tetovo
+  - Tetovë
+  - Tetoves
+  - Tetovës
+- name: Куманово
+  type: location
+  aliases:
+  - Kumanovo
+- name: Прилеп
+  type: location
+  aliases:
+  - Prilep
+- name: Стево Пендаровски
+  type: person
+  aliases:
+  - Пендаровски
+  - Stevo Pendarovski
+  - Pendarovski
+- name: Венко Филипче
+  type: person
+  aliases:
+  - Филипче
+  - Venko Filipche
+  - Venko Filipce
+  - Filipche
+  - Filipce
+- name: Димитар Апасиев
+  type: person
+  aliases:
+  - Апасиев
+  - Dimitar Apasiev
+  - Apasiev
+- name: Максим Димитриевски
+  type: person
+  aliases:
+  - Димитриевски
+  - Maksim Dimitrievski
+  - Dimitrievski
+- name: Изет Меџити
+  type: person
+  aliases:
+  - Меџити
+  - Izet Mexhiti
+  - Mexhiti
+- name: Арбен Таравари
+  type: person
+  aliases:
+  - Таравари
+  - Arben Taravari
+  - Taravari
+- name: Билал Касами
+  type: person
+  aliases:
+  - Касами
+  - Bilall Kasami
+  - Kasami
+- name: Тимчо Муцунски
+  type: person
+  aliases:
+  - Муцунски
+  - Timcho Mucunski
+  - Mucunski
+- name: Љупчо Димовски
+  type: person
+  aliases:
+  - Димовски
+  - Ljupcho Dimovski
+- name: Горан Милевски
+  type: person
+  aliases:
+  - Милевски
+  - Goran Milevski
+- name: ВЛЕН
+  type: organization
+  aliases:
+  - Вреди
+  - Коалиција ВЛЕН
+  - VLEN
+  - Vredi
+  - Koalicioni VLEN
+- name: Никола Груевски
+  type: person
+  aliases:
+  - Груевски
+  - Nikola Gruevski
+  - Gruevski
+- name: Талат Џафери
+  type: person
+  aliases:
+  - Џафери
+  - Talat Xhaferi
+  - Xhaferi
+- name: Радмила Шекеринска
+  type: person
+  aliases:
+  - Шекеринска
+  - Radmila Sekerinska
+  - Sekerinska
+- name: Моника Зајкова
+  type: person
+  aliases:
+  - Зајкова
+  - Monika Zajkova
+  - Zajkova
+- name: Алтернатива
+  type: organization
+  aliases:
+  - Alternativa
+- name: Движење Беса
+  type: organization
+  aliases:
+  - Беса
+  - Besa
+  - BESA
+- name: Демократско движење
+  type: organization
+  aliases:
+  - Democratic Movement
+- name: ДОМ
+  type: organization
+  aliases:
+  - DOM
+- name: ЛДП
+  type: organization
+  aliases:
+  - Либерално-демократска партија
+  - LDP
+- name: ГРОМ
+  type: organization
+  aliases:
+  - GROM
+- name: Министерство за финансии
+  type: organization
+  aliases:
+  - МФ
+  - Министерството за финансии
+  - Ministry of Finance
+- name: Министерство за правда
+  type: organization
+  aliases:
+  - Министерството за правда
+  - Ministry of Justice
+- name: Министерство за здравство
+  type: organization
+  aliases:
+  - МЗ
+  - Министерството за здравство
+  - Ministry of Health
+- name: Министерство за образование и наука
+  type: organization
+  aliases:
+  - МОН
+  - Ministry of Education and Science
+- name: Државна изборна комисија
+  type: organization
+  aliases:
+  - ДИК
+  - State Election Commission
+  - SEC
+- name: Државна комисија за спречување на корупцијата
+  type: organization
+  aliases:
+  - ДКСК
+  - Антикорупциска комисија
+  - State Commission for Prevention of Corruption
+- name: Уставен суд
+  type: organization
+  aliases:
+  - Уставниот суд
+  - Constitutional Court
+- name: Јавно обвинителство
+  type: organization
+  aliases:
+  - Обвинителство
+  - Public Prosecutor's Office
+- name: Народна банка
+  type: organization
+  aliases:
+  - НБРСМ
+  - Народната банка
+  - Народна банка на Република Северна Македонија
+  - National Bank
+- name: Центар за управување со кризи
+  type: organization
+  aliases:
+  - ЦУК
+  - Crisis Management Center
+- name: Државен завод за статистика
+  type: organization
+  aliases:
+  - ДЗС
+  - Државниот завод за статистика
+  - State Statistical Office
+- name: Штип
+  type: location
+  aliases:
+  - Shtip
+  - Stip
+- name: Велес
+  type: location
+  aliases:
+  - Veles
+- name: Гостивар
+  type: location
+  aliases:
+  - Gostivar
+- name: Струмица
+  type: location
+  aliases:
+  - Strumica
+- name: Кавадарци
+  type: location
+  aliases:
+  - Kavadarci
+- name: Кочани
+  type: location
+  aliases:
+  - Kochani
+  - Kocani
+- name: Струга
+  type: location
+  aliases:
+  - Struga
+- name: Дебар
+  type: location
+  aliases:
+  - Debar
+- name: Гевгелија
+  type: location
+  aliases:
+  - Gevgelija
+- name: Европска Унија
+  type: organization
+  aliases:
+  - Европската Унија
+  - ЕУ
+  - European Union
+  - EU
+- name: Брисел
+  type: location
+  aliases:
+  - Brussels
+- name: Вашингтон
+  type: location
+  aliases:
+  - Washington
+- name: Отворен Балкан
+  type: organization
+  aliases:
+  - Open Balkan
+  - Ballkani i Hapur
+  - Ballkanin e Hapur
