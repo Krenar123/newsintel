@@ -42,6 +42,7 @@ def main() -> int:
     validate_auth(findings, production)
     validate_cors(findings, production)
     validate_ingestion(findings)
+    validate_retrieval(findings, production)
     validate_email(findings)
     validate_paths(findings)
     validate_optional_integrations(findings, production)
@@ -134,6 +135,38 @@ def validate_ingestion(findings: list[dict]) -> None:
         add(findings, "warning", "duplicate_stop", "Duplicate-stop threshold is very low.")
     else:
         add(findings, "ok", "duplicate_stop", f"Duplicate-stop threshold is {settings.stop_after_consecutive_duplicates}.")
+
+
+def validate_retrieval(findings: list[dict], production: bool) -> None:
+    if not 0.1 <= settings.rag_minimum_score <= 20:
+        add(findings, "error", "rag_minimum_score", "RAG_MINIMUM_SCORE must be between 0.1 and 20.")
+    else:
+        add(findings, "ok", "rag_minimum_score", f"RAG minimum score is {settings.rag_minimum_score:.2f}.")
+    if not 1 <= settings.rag_max_per_source <= 10:
+        add(findings, "error", "rag_source_cap", "RAG_MAX_PER_SOURCE must be between 1 and 10.")
+    if not 4 <= settings.rag_max_evidence <= 24:
+        add(findings, "error", "rag_evidence_cap", "RAG_MAX_EVIDENCE must be between 4 and 24.")
+
+    report_path = settings.base_dir / "data" / "rag_evaluations" / "latest_quality_report.json"
+    if report_path.exists():
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            passed = bool((report.get("production_gate") or {}).get("passed"))
+            add(
+                findings,
+                "ok" if passed else "error",
+                "rag_quality_gate",
+                "RAG retrieval gate passed." if passed else "Latest RAG retrieval gate did not pass.",
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            add(findings, "error", "rag_quality_report", f"Cannot read RAG quality report: {exc}")
+    elif production:
+        add(
+            findings,
+            "warning",
+            "rag_quality_missing",
+            "No RAG holdout report exists at data/rag_evaluations/latest_quality_report.json.",
+        )
 
 
 def validate_email(findings: list[dict]) -> None:

@@ -857,6 +857,17 @@ export type ClientChatResponse = {
     grounding_validated?: boolean;
     reason?: string;
   };
+  retrieval: {
+    engine?: string;
+    query_terms?: string[];
+    considered_count?: number;
+    eligible_count?: number;
+    returned_count?: number;
+    source_count?: number;
+    abstained?: boolean;
+    abstention_reason?: string;
+    top_results?: Array<Record<string, unknown>>;
+  };
   history: ClientChatTurn[];
   saved_briefing_id?: number | null;
   disclaimer: string;

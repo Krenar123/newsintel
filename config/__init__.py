@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     ai_max_output_tokens: int = 1400
     ai_grounding_required: bool = True
 
+    # Evidence retrieval. Quality/source boosts never admit a lexical non-match.
+    rag_minimum_score: float = 0.85
+    rag_max_per_source: int = 4
+    rag_max_evidence: int = 16
+
     # Entity intelligence. GLiNER is optional and runs locally when installed.
     enable_gliner_ner: bool = False
     gliner_model: str = "urchade/gliner_multi-v2.1"

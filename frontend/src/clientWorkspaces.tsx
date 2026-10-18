@@ -530,6 +530,11 @@ function ClientChatPanel({
                 </Pill>
                 <Pill>{chatAnswer.confidence.article_count ?? 0} articles</Pill>
                 <Pill>{chatAnswer.confidence.source_count ?? 0} sources</Pill>
+                <Pill tone={chatAnswer.retrieval?.abstained ? "coral" : "green"}>
+                  {chatAnswer.retrieval?.abstained
+                    ? "No supported match"
+                    : `${chatAnswer.retrieval?.returned_count ?? chatAnswer.confidence.article_count ?? 0} ranked evidence`}
+                </Pill>
                 <Pill>{chatAnswer.mode.replaceAll("_", " ")}</Pill>
                 <Pill tone={chatAnswer.generation?.grounding_validated ? "green" : "gold"}>
                   {chatAnswer.generation?.grounding_validated ? "AI + citations checked" : "Local evidence answer"}
@@ -811,6 +816,11 @@ export function PoliticalFigureWorkspace({
                       {chatAnswer.confidence.level || "unknown"} confidence
                     </Pill>
                     <Pill>{chatAnswer.confidence.source_count ?? 0} sources</Pill>
+                    <Pill tone={chatAnswer.retrieval?.abstained ? "coral" : "green"}>
+                      {chatAnswer.retrieval?.abstained
+                        ? "No supported match"
+                        : `${chatAnswer.retrieval?.returned_count ?? chatAnswer.confidence.article_count ?? 0} ranked evidence`}
+                    </Pill>
                   </div>
                   {chatAnswer.summary.split("\n").filter(Boolean).slice(0, 3).map((line) => <p key={line}>{line}</p>)}
                   {chatAnswer.citations.length ? (

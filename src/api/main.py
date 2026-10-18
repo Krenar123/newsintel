@@ -107,6 +107,7 @@ from src.processing.story_clustering import StoryClusterer
 from src.processing.risk_scoring import PoliticalRiskScorer
 from src.processing.attack_analysis import analyze_attack_text, detect_attack_categories
 from src.intelligence.grounded_ai import GroundedAI
+from src.intelligence.retrieval import RetrievalDocument, RetrievalOutcome, rank_documents
 from src.logging_config import configure_logging
 
 import structlog
@@ -5752,6 +5753,7 @@ def ask_client_intelligence(
             "confidence": response_payload["confidence"],
             "restrictions": response_payload["restrictions"],
             "generation": response_payload["generation"],
+            "retrieval": response_payload["retrieval"],
         },
     )
     db.add_all([user_message, assistant_message])
@@ -5779,6 +5781,7 @@ def ask_client_intelligence(
             "legal_context": response_payload["legal_context"],
             "matched_entities": response_payload["matched_entities"],
             "generation": response_payload["generation"],
+            "retrieval": response_payload["retrieval"],
         },
         source_article_ids=[article.id for article in response_payload["source_articles"]],
         confidence=response_payload["confidence"],
@@ -5812,6 +5815,7 @@ def ask_client_intelligence(
         matched_entities=response_payload["matched_entities"],
         confidence=response_payload["confidence"],
         generation=response_payload["generation"],
+        retrieval=response_payload["retrieval"],
         history=[_chat_turn_to_response(message) for message in history],
         saved_briefing_id=briefing.id,
         disclaimer=(
@@ -8554,24 +8558,57 @@ def _build_client_chat_response(
     detected_mode = _client_chat_mode(clean_question, mode)
     retrieval_question = _chat_retrieval_query(clean_question, conversation_history)
     base_articles = _matching_watchlist_articles(db, client, watchlist, since, limit=120)
-    scored_articles = _score_chat_articles(retrieval_question, base_articles)
-    source_articles = scored_articles[:12] if scored_articles else base_articles[:12]
+    candidate_articles = list(base_articles)
 
     if allow_wider_context:
-        wider_articles = _search_articles_for_question(db, client.country_code, retrieval_question, since, limit=60)
-        by_id = {article.id: article for article in source_articles}
+        wider_articles = _search_articles_for_question(
+            db, client.country_code, retrieval_question, since, limit=60
+        )
+        by_id = {article.id: article for article in candidate_articles}
         for article in wider_articles:
             by_id.setdefault(article.id, article)
-        source_articles = sorted(
-            by_id.values(),
-            key=lambda article: article.published_at or article.fetched_at or article.ingested_at or datetime.datetime.min,
-            reverse=True,
-        )[:16]
+        candidate_articles = list(by_id.values())
+
+    retrieval = _retrieve_chat_articles(
+        retrieval_question,
+        candidate_articles,
+        limit=16 if allow_wider_context else 12,
+    )
+    if retrieval.abstained and _chat_uses_scope_context(clean_question):
+        scope_terms = " ".join(
+            item.value.strip()
+            for item in watchlist[:4]
+            if item.value and item.item_type in (
+                WatchlistItemType.ENTITY,
+                WatchlistItemType.KEYWORD,
+                WatchlistItemType.TOPIC,
+            )
+        )
+        if scope_terms:
+            retrieval = _retrieve_chat_articles(
+                f"{retrieval_question} {scope_terms}",
+                candidate_articles,
+                limit=16 if allow_wider_context else 12,
+            )
+    source_articles = [
+        item.document.metadata["article"]
+        for item in retrieval.results
+    ]
+    retrieval_diagnostics = retrieval.diagnostics()
 
     risk_items = _build_watchlist_risk_items(db, watchlist, since)
     source_counts = _article_source_counts(source_articles)
     matched_entities = _top_entities_for_articles(db, source_articles)
     citations = _citation_pack(_source_evidence_brief(source_articles, limit=8))
+    retrieval_by_id = {
+        item.document.document_id: item.diagnostics()
+        for item in retrieval.results
+    }
+    for citation in citations:
+        diagnostics = retrieval_by_id.get(citation.get("article_id"), {})
+        citation["retrieval_score"] = diagnostics.get("score")
+        citation["query_coverage"] = diagnostics.get("query_coverage")
+        citation["matched_terms"] = diagnostics.get("matched_terms", [])
     legal_context = []
     if detected_mode == "response_help" or _claim_has_legal_trigger(clean_question):
         legal_context = _macedonian_legal_context(
@@ -8616,14 +8653,32 @@ def _build_client_chat_response(
         risk_items=risk_items,
         source_counts=source_counts,
     )
+    mean_query_coverage = (
+        sum(item.query_coverage for item in retrieval.results[:8])
+        / min(8, len(retrieval.results))
+        if retrieval.results else 0.0
+    )
     confidence = {
-        "level": "high" if len(source_counts) >= 3 and len(source_articles) >= 6 else "medium" if source_articles else "low",
+        "level": (
+            "high"
+            if len(source_counts) >= 3 and len(source_articles) >= 6 and mean_query_coverage >= 0.35
+            else "medium" if source_articles and mean_query_coverage >= 0.15
+            else "low"
+        ),
         "article_count": len(source_articles),
         "source_count": len(source_counts),
         "risk_item_count": len(risk_items),
         "history_messages_used": len(conversation_history),
         "effective_days": effective_days,
-        "reason": "Grounded in stored articles matching the client scope and question; each surfaced report has a citation label.",
+        "mean_query_coverage": round(mean_query_coverage, 4),
+        "top_retrieval_score": (
+            round(retrieval.results[0].score, 4) if retrieval.results else None
+        ),
+        "reason": (
+            "Grounded in relevance-ranked stored articles matching the client scope "
+            "and question; each surfaced report has a citation label."
+        ),
+        "retrieval": retrieval_diagnostics,
     }
     return {
         "mode": detected_mode,
@@ -8637,6 +8692,7 @@ def _build_client_chat_response(
         "source_articles": source_articles,
         "matched_entities": matched_entities,
         "confidence": confidence,
+        "retrieval": retrieval_diagnostics,
     }
 
 
@@ -8821,39 +8877,61 @@ def _chat_question_terms(question: str) -> list[str]:
     return unique[:12]
 
 
-def _score_chat_articles(question: str, articles: list[Article]) -> list[Article]:
-    terms = _chat_question_terms(question)
-    if not terms:
-        return articles
-    scored: list[tuple[int, Article]] = []
-    for article in articles:
-        text_value = " ".join([
-            article.title or "",
-            article.content or "",
-            article.search_text or "",
-            article.source.name if article.source else "",
-            article.platform_account_name or "",
-        ]).lower()
-        score = 0
-        for term in terms:
-            variants = search_variants(term)
-            if any(variant.lower() in text_value for variant in variants):
-                score += 3 if term in (article.title or "").lower() else 1
-        if score:
-            scored.append((score, article))
-    if not scored:
-        return articles
-    return [
-        article for _score, article in sorted(
-            scored,
-            key=lambda row: (
-                row[0],
-                row[1].published_at or row[1].fetched_at or row[1].ingested_at or datetime.datetime.min,
-            ),
-            reverse=True,
-        )
-    ]
+def _article_retrieval_document(article: Article) -> RetrievalDocument:
+    """Map a permitted article to the provider-neutral retrieval contract."""
+    summary = article.summaries[0].text if article.summaries else ""
+    entity_names = tuple(dict.fromkeys(
+        mention.entity.name
+        for mention in article.entity_mentions
+        if mention.entity and is_client_publishable_entity(mention.entity)
+    ))
+    source = article.source
+    return RetrievalDocument(
+        document_id=article.id,
+        title=article.title or "",
+        content=(article.content or "")[:16000],
+        summary=summary,
+        entity_names=entity_names,
+        source_name=source.name if source else article.platform_account_name or "Unknown",
+        source_id=article.source_id,
+        published_at=article.published_at or article.fetched_at or article.ingested_at,
+        reliability_score=source.reliability_score if source else None,
+        language=article.language or "",
+        metadata={"article": article},
+    )
 
+
+def _retrieve_chat_articles(
+    question: str,
+    articles: list[Article],
+    *,
+    limit: int,
+) -> RetrievalOutcome:
+    """Rank only the articles already admitted by client permission filters."""
+    return rank_documents(
+        question,
+        (_article_retrieval_document(article) for article in articles),
+        limit=min(limit, settings.rag_max_evidence),
+        minimum_score=settings.rag_minimum_score,
+        max_per_source=settings.rag_max_per_source,
+    )
+
+
+def _score_chat_articles(question: str, articles: list[Article]) -> list[Article]:
+    """Compatibility wrapper around the production hybrid retriever."""
+    outcome = _retrieve_chat_articles(question, articles, limit=len(articles) or 1)
+    return [item.document.metadata["article"] for item in outcome.results]
+
+
+def _chat_uses_scope_context(question: str) -> bool:
+    """Allow persona expansion only for clearly scoped dashboard questions."""
+    normalized = question.casefold()
+    markers = {
+        "me", "my", "myself", "mention", "mentions", "coverage", "attack", "attacked",
+        "latest", "recent", "today", "мене", "мој", "мои", "спомн", "напад",
+        "послед", "најнов", "денес",
+    }
+    return any(marker in normalized for marker in markers)
 
 def _search_articles_for_question(
     db: Session,
@@ -8983,7 +9061,15 @@ def _client_chat_answer(
             f"I did not find stored coverage for {client_label} that matches this question in the permitted scope. "
             "Try a broader term, extend the date window, or add the missing person/topic to the watchlist."
         )
-    latest = articles[0]
+    latest = max(
+        articles,
+        key=lambda article: (
+            article.published_at
+            or article.fetched_at
+            or article.ingested_at
+            or datetime.datetime.min
+        ),
+    )
     latest_source = latest.source.name if latest.source else "Unknown"
     citation_by_article = {item.get("article_id"): item.get("label") for item in citations}
     latest_label = citation_by_article.get(latest.id, "S1")

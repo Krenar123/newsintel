@@ -1,0 +1,60 @@
+documents:
+  - id: 1
+    title: "Мицкоски најави владина седница за економските мерки"
+    summary: "Премиерот Христијан Мицкоски најави седница посветена на економијата."
+    entities: ["Христијан Мицкоски", "Влада на Република Северна Македонија"]
+    source_name: "Portal A"
+    source_id: 1
+    reliability_score: 0.9
+    language: mk
+    published_at: "2026-10-17T10:00:00"
+  - id: 2
+    title: "СДСМ го критикува владиниот економски пакет"
+    summary: "Партијата побара образложение за предвидените мерки."
+    entities: ["СДСМ"]
+    source_name: "Portal B"
+    source_id: 2
+    reliability_score: 0.8
+    language: mk
+    published_at: "2026-10-17T11:00:00"
+  - id: 3
+    title: "VMRO-DPMNE responds to criticism about economic measures"
+    entities: ["ВМРО-ДПМНЕ"]
+    source_name: "Portal C"
+    source_id: 3
+    reliability_score: 0.85
+    language: en
+    published_at: "2026-10-17T12:00:00"
+  - id: 4
+    title: "Собранието ја продолжи расправата за уставните измени"
+    entities: ["Собрание на Република Северна Македонија"]
+    source_name: "Portal D"
+    source_id: 4
+    reliability_score: 0.9
+    language: mk
+    published_at: "2026-10-16T12:00:00"
+  - id: 5
+    title: "Фудбалскиот клуб го претстави новиот тренер"
+    source_name: "Portal E"
+    source_id: 5
+    reliability_score: 0.9
+    language: mk
+    published_at: "2026-10-18T09:00:00"
+queries:
+  - id: mickoski
+    query: "Што најави Христијан Мицкоски?"
+    relevant_document_ids: [1]
+  - id: vmro_latin
+    query: "VMRO-DPMNE economic measures"
+    relevant_document_ids: [3]
+  - id: constitution
+    query: "уставни измени Собрание"
+    relevant_document_ids: [4]
+  - id: unsupported
+    query: "марсовска мисија и вселенска станица"
+    relevant_document_ids: []
+  - id: permission_scope
+    query: "СДСМ економски пакет"
+    allowed_document_ids: [1, 3, 4, 5]
+    relevant_document_ids: []
+    forbidden_document_ids: [2]

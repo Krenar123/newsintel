@@ -56,6 +56,13 @@ For a real production claim, label a source-stratified article batch and run:
 
 See `docs/ENTITY_QUALITY_PRODUCTION.md` for the annotation contract and gates.
 
+RAG retrieval regression and production holdout:
+
+    .\venv\Scripts\python.exe scripts\evaluate_rag_retrieval.py tests\fixtures\rag_retrieval_mk.yaml
+    .\venv\Scripts\python.exe scripts\evaluate_rag_retrieval.py <holdout.yaml> --production --output data\rag_evaluations\latest_quality_report.json
+
+See `docs/RAG_PRODUCTION.md` for the permission, ranking, abstention, and quality-gate contract.
+
 The final command is a dry run. Apply only after reviewing its counts:
 
     .\venv\Scripts\python.exe scripts\sync_entity_lexicon.py --country mk --transition-auto --batch-size 5000 --apply

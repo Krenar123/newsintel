@@ -527,6 +527,7 @@ class ClientChatResponse(BaseModel):
     matched_entities: list[dict] = Field(default_factory=list)
     confidence: dict = Field(default_factory=dict)
     generation: dict = Field(default_factory=dict)
+    retrieval: dict = Field(default_factory=dict)
     history: list[ClientChatTurnResponse] = Field(default_factory=list)
     saved_briefing_id: Optional[int] = None
     disclaimer: str

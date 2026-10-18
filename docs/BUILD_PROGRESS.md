@@ -781,3 +781,30 @@ professional review:
   1,194 current story clusters, 15 legal references, and one in-app pilot alert.
 - Local and Docker NLP are aligned on spaCy 3.8 with `xx_ent_wiki_sm` 3.8.0.
 - Final pilot readiness: `10 / 10`, zero failures and zero warnings.
+
+
+### Permission-Scoped Hybrid RAG Upgrade (2026-10-18)
+
+- Replaced chat's recency/substring ranking and unrelated fallback with a
+  deterministic multilingual BM25F-style retriever.
+- Ranking combines title, summary, approved entities, and article content, with
+  bounded phrase, freshness, and configured source-quality refinements.
+- Added Cyrillic/Latin query variants and cross-script stopword protection.
+- Added per-source caps, story-diversity penalties, minimum relevance thresholds,
+  and explicit abstention when the permitted data cannot support an answer.
+- Permission filtering remains before retrieval; wider context is available only
+  to admins, analysts, or explicitly entitled clients.
+- Chat responses and saved audit history now include retrieval diagnostics and
+  both client workspace variants show ranked-evidence or no-supported-match state.
+- Added deployment settings and validation for relevance threshold, source cap,
+  evidence cap, and the latest RAG holdout report.
+- Added a multilingual retrieval fixture and production evaluator for precision,
+  recall, MRR, nDCG, abstention accuracy, source coverage, and forbidden-document
+  leakage.
+- Compact fixture result: precision/recall/MRR/nDCG/abstention all 1.00 with zero
+  forbidden hits. This is regression proof only; the production gate correctly
+  remains closed until 50 representative questions across 10 sources are reviewed.
+- Read-only local database smoke test returned 12 relevant watchlist-ranked
+  articles across 11 sources and exposed/fixed cross-script stopword contamination.
+- Final verification: 48/48 Python tests, 12 focused RAG/grounding tests, clean
+  multilingual fixture, valid environment checks, and a successful frontend production build.
