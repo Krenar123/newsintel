@@ -32,6 +32,8 @@ def evaluate(fixture_path: Path) -> dict:
         "expected": 0,
         "true_positive": 0,
         "false_positive": 0,
+        "publishable_true_positive": 0,
+        "publishable_false_positive": 0,
         "missing": 0,
         "wrong_type": 0,
         "forbidden": 0,
@@ -45,6 +47,11 @@ def evaluate(fixture_path: Path) -> dict:
             max_entities=100,
         )
         actual = {(entity.canonical_name, entity.entity_type) for entity in result.entities}
+        publishable = {
+            (entity.canonical_name, entity.entity_type)
+            for entity in result.entities
+            if entity.publishable
+        }
         expected = {
             _key(str(item["name"]), str(item["type"]))
             for item in case.get("expected", [])
@@ -69,12 +76,19 @@ def evaluate(fixture_path: Path) -> dict:
             if pair[0] not in expected_names
         }
         forbidden = actual_names & forbidden_names
+        publishable_true_positive = publishable & expected
+        publishable_unexpected = {
+            pair for pair in publishable
+            if pair[0] not in expected_names
+        }
 
         totals["expected"] += len(expected)
         totals["true_positive"] += len(true_positive)
         totals["missing"] += len(missing)
         totals["wrong_type"] += len(wrong_type)
         totals["false_positive"] += len(unexpected)
+        totals["publishable_true_positive"] += len(publishable_true_positive)
+        totals["publishable_false_positive"] += len(publishable_unexpected)
         totals["forbidden"] += len(forbidden)
 
         case_results.append({
@@ -86,6 +100,9 @@ def evaluate(fixture_path: Path) -> dict:
                 for name, actual_type, expected_type in wrong_type
             ),
             "unexpected": sorted(f"{name} [{kind}]" for name, kind in unexpected),
+            "publishable_unexpected": sorted(
+                f"{name} [{kind}]" for name, kind in publishable_unexpected
+            ),
             "forbidden": sorted(forbidden),
         })
 
@@ -98,12 +115,26 @@ def evaluate(fixture_path: Path) -> dict:
         totals["true_positive"] / precision_denominator
         if precision_denominator else 1.0
     )
+    publishable_precision_denominator = (
+        totals["publishable_true_positive"]
+        + totals["publishable_false_positive"]
+    )
+    publishable_precision = (
+        totals["publishable_true_positive"] / publishable_precision_denominator
+        if publishable_precision_denominator else 1.0
+    )
+    publishable_recall = (
+        totals["publishable_true_positive"] / totals["expected"]
+        if totals["expected"] else 1.0
+    )
     f1 = (
         2 * precision * recall / (precision + recall)
         if precision + recall else 0.0
     )
     totals.update({
         "precision": round(precision, 4),
+        "publishable_precision": round(publishable_precision, 4),
+        "publishable_recall": round(publishable_recall, 4),
         "recall": round(recall, 4),
         "f1": round(f1, 4),
         "passed_cases": sum(1 for item in case_results if item["passed"]),
@@ -112,9 +143,13 @@ def evaluate(fixture_path: Path) -> dict:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
-    parser.add_argument("--fail-under-precision", type=float, default=0.90)
+    parser.add_argument("--fail-under-precision", type=float, default=0.98)
+    parser.add_argument("--fail-under-publishable-precision", type=float, default=0.98)
+    parser.add_argument("--fail-under-publishable-recall", type=float, default=0.95)
     parser.add_argument("--fail-under-recall", type=float, default=0.95)
     parser.add_argument("--json", action="store_true", help="Print machine-readable output")
     args = parser.parse_args()
@@ -135,6 +170,8 @@ def main() -> int:
             "Entity quality: "
             f"{summary['passed_cases']}/{summary['cases']} cases, "
             f"precision={summary['precision']:.1%}, "
+            f"publishable_precision={summary['publishable_precision']:.1%}, "
+            f"publishable_recall={summary['publishable_recall']:.1%}, "
             f"recall={summary['recall']:.1%}, "
             f"F1={summary['f1']:.1%}, "
             f"forbidden={summary['forbidden']}"
@@ -142,6 +179,8 @@ def main() -> int:
 
     passed = (
         summary["precision"] >= args.fail_under_precision
+        and summary["publishable_precision"] >= args.fail_under_publishable_precision
+        and summary["publishable_recall"] >= args.fail_under_publishable_recall
         and summary["recall"] >= args.fail_under_recall
         and summary["forbidden"] == 0
     )

@@ -7,6 +7,9 @@ dist/
 build/
 venv/
 .venv/
+.tools/
+.pytest_cache/
+.ruff_cache/
 
 # Environment
 .env
@@ -21,8 +24,10 @@ venv/
 reports/
 ml_models/
 *.pkl
+*.log
 
-# Database
+# Runtime data, local databases, downloaded legal files and backups
+data/
 *.db
 *.sqlite3
 
@@ -33,3 +38,7 @@ Thumbs.db
 # Frontend tests
 frontend/test-results/
 frontend/playwright-report/
+frontend/node_modules/
+frontend/dist/
+frontend/debug.log
+npm-debug.log*

@@ -23,7 +23,12 @@ from src.models.database import (
 )
 from src.processing.entities import corrected_entity_type, is_likely_entity_name
 from src.search.normalization import search_variants
-from src.search.predicates import article_text_match, entity_text_match
+from src.search.predicates import (
+    article_text_match,
+    client_publishable_entity_filter,
+    entity_text_match,
+    is_client_publishable_entity,
+)
 
 import structlog
 
@@ -183,7 +188,7 @@ class SearchEngine:
     ) -> list[Entity]:
         """Search entities by name."""
         q = self.session.query(Entity)
-        q = q.filter(Entity.status != EntityStatus.HIDDEN)
+        q = q.filter(client_publishable_entity_filter())
 
         condition = entity_text_match(self.session, [query])
         if condition is not None:
@@ -210,7 +215,7 @@ class SearchEngine:
     ) -> dict:
         """Get all articles mentioning a specific entity."""
         entity = self.session.query(Entity).get(entity_id)
-        if not entity:
+        if not is_client_publishable_entity(entity):
             return {"entity": None, "articles": [], "total": 0}
 
         query = (
@@ -219,7 +224,7 @@ class SearchEngine:
             .join(Entity, Entity.id == EntityMention.entity_id)
             .filter(EntityMention.entity_id == entity_id)
             .filter(or_(Article.quality_status == None, Article.quality_status != "excluded"))
-            .filter(Entity.status != EntityStatus.HIDDEN)
+            .filter(client_publishable_entity_filter())
             .order_by(desc(Article.published_at))
         )
 
@@ -275,7 +280,7 @@ class SearchEngine:
             .join(Article, Article.id == EntityMention.article_id)
             .filter(Article.published_at >= recent_start)
             .filter(or_(Article.quality_status == None, Article.quality_status != "excluded"))
-            .filter(Entity.status != EntityStatus.HIDDEN)
+            .filter(client_publishable_entity_filter())
         )
 
         if entity_type:

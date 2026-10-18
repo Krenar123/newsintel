@@ -6,11 +6,21 @@ from collections.abc import Iterable
 
 from sqlalchemy import func, literal_column, or_
 
-from src.models.database import Article, Entity
+from src.models.database import Article, Entity, EntityStatus
 from src.search.normalization import search_variants
 
 
 _SIMPLE_CONFIG = literal_column("'simple'::regconfig")
+
+
+def client_publishable_entity_filter():
+    """SQL predicate for entities approved for client-facing surfaces."""
+    return Entity.status == EntityStatus.APPROVED
+
+
+def is_client_publishable_entity(entity: Entity | None) -> bool:
+    """In-memory equivalent of client_publishable_entity_filter."""
+    return bool(entity and entity.status == EntityStatus.APPROVED)
 
 
 def article_text_match(session, terms: Iterable[str], *, exact: bool = False):

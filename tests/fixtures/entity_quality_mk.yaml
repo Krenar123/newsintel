@@ -190,3 +190,50 @@ cases:
       - {name: "Отворен Балкан", type: organization}
       - {name: "Северна Македонија", type: location}
       - {name: "Скопје", type: location}
+
+  - id: albanian_inflected_locations
+    language: sq
+    text: "Nga Kosovën dhe Shqipërisë delegacionet udhëtuan drejt Tiranës, ndërsa takimi tjetër mbahet në Prishtinë."
+    expected:
+      - {name: "Косово", type: location}
+      - {name: "Албанија", type: location}
+      - {name: "Тирана", type: location}
+      - {name: "Приштина", type: location}
+    forbidden:
+      - "Ndërsa"
+
+  - id: albanian_ordinary_words_are_not_entities
+    language: sq
+    text: "Një burim tha se sipas portalit këto etiketa janë shënim, ndërkohë dërgoni lajmin në media sociale."
+    expected: []
+    forbidden:
+      - "Një"
+      - "Sipas"
+      - "Burimi"
+      - "Portali"
+      - "Këto"
+      - "Etiketat"
+      - "Shënim"
+      - "Ndërkohë"
+      - "Dërgoni"
+      - "Media Sociale"
+
+  - id: macedonian_scraper_fragments_are_not_entities
+    language: mk
+    text: "Следете го порталот. Иако Законот се споменува, Агенцијата и Центарот не се именувани институции."
+    expected: []
+    forbidden:
+      - "Следете"
+      - "Иако"
+      - "Законот"
+      - "Агенцијата"
+      - "Центарот"
+
+  - id: flaka_boilerplate_is_not_entity
+    language: sq
+    text: "Flaka Media Redaksia Flaka Flaka AI Media Sociale"
+    expected: []
+    forbidden:
+      - "Flaka Media"
+      - "Redaksia Flaka Flaka AI"
+      - "Media Sociale"

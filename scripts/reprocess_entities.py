@@ -28,6 +28,7 @@ from src.models.database import (
     get_session_factory,
 )
 from src.processing.entities import EntityExtractor
+from src.processing.entity_persistence import get_or_create_extracted_entity
 from src.processing.sentiment import SentimentAnalyzer
 
 
@@ -111,29 +112,7 @@ def main():
 
 
 def _get_or_create_entity(session, extracted) -> Entity:
-    entity_type = EntityType(extracted.entity_type)
-    entity = (
-        session.query(Entity)
-        .filter(
-            Entity.canonical_name == extracted.canonical_name,
-            Entity.entity_type == entity_type,
-        )
-        .first()
-    )
-    if entity:
-        if entity.status == EntityStatus.HIDDEN:
-            entity.status = EntityStatus.NEEDS_REVIEW
-        return entity
-
-    entity = Entity(
-        name=extracted.name,
-        canonical_name=extracted.canonical_name,
-        entity_type=entity_type,
-        status=EntityStatus.AUTO,
-    )
-    session.add(entity)
-    session.flush()
-    return entity
+    return get_or_create_extracted_entity(session, extracted)
 
 
 def _recompute_entity(session, entity_id: int):

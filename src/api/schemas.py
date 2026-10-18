@@ -88,6 +88,10 @@ class EntityResponse(BaseModel):
     entity_type: str
     status: str = "auto"
     review_notes: Optional[str] = None
+    provenance: list[str] = Field(default_factory=list)
+    confidence: Optional[float] = None
+    publishable: bool = False
+    matched_aliases: list[str] = Field(default_factory=list)
     total_mentions: int
     first_seen_at: datetime.datetime
     last_seen_at: datetime.datetime

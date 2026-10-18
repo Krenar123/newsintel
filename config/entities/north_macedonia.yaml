@@ -111,6 +111,68 @@ entities:
   - Maqedonia e Veriut
   - Maqedoninë e Veriut
   - Maqedonisë së Veriut
+- name: Албанија
+  type: location
+  aliases:
+  - Albania
+  - Shqipëri
+  - Shqipëria
+  - Shqipërisë
+  - Shqipërinë
+- name: Косово
+  type: location
+  aliases:
+  - Kosovo
+  - Kosovë
+  - Kosova
+  - Kosovës
+  - Kosovën
+- name: Иран
+  type: location
+  aliases:
+  - Iran
+  - Irani
+  - Iranin
+  - Iranit
+- name: Тирана
+  type: location
+  aliases:
+  - Tirana
+  - Tiranë
+  - Tiranës
+  - Tiranën
+- name: Приштина
+  type: location
+  aliases:
+  - Pristina
+  - Prishtina
+  - Prishtinë
+  - Prishtinës
+  - Prishtinën
+- name: Србија
+  type: location
+  aliases:
+  - Serbia
+  - Serbi
+  - Srbija
+  - Serbisë
+  - Serbinë
+- name: Грција
+  type: location
+  aliases:
+  - Greece
+  - Greqi
+  - Greqia
+  - Greqisë
+  - Greqinë
+- name: Бугарија
+  type: location
+  aliases:
+  - Bulgaria
+  - Bullgari
+  - Bullgaria
+  - Bullgarisë
+  - Bullgarinë
 - name: САД
   type: location
   aliases:
@@ -131,6 +193,7 @@ entities:
   type: location
   aliases:
   - Ohrid
+  - Ohrit
 - name: Битола
   type: location
   aliases:

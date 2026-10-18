@@ -28,6 +28,7 @@ from src.models.database import (
 from src.processing.summarizer import Summarizer
 from src.processing.categorizer import Categorizer
 from src.processing.entities import EntityExtractor
+from src.processing.entity_persistence import get_or_create_extracted_entity
 from src.processing.sentiment import SentimentAnalyzer
 from src.processing.alerts import AlertEngine, NotificationDispatcher
 from src.ingestion.rss_fetcher import RawArticle, normalize_url
@@ -415,30 +416,7 @@ class ProcessingPipeline:
 
     def _get_or_create_entity(self, extracted) -> Entity:
         """Find existing entity or create a new one (deduplicated)."""
-        entity_type = EntityType(extracted.entity_type)
-
-        entity = (
-            self.session.query(Entity)
-            .filter(
-                Entity.canonical_name == extracted.canonical_name,
-                Entity.entity_type == entity_type,
-            )
-            .first()
-        )
-
-        if not entity:
-            entity = Entity(
-                name=extracted.name,
-                canonical_name=extracted.canonical_name,
-                search_text=search_blob(extracted.name, extracted.canonical_name),
-                entity_type=entity_type,
-            )
-            self.session.add(entity)
-            self.session.flush()
-        elif not entity.search_text:
-            entity.search_text = search_blob(entity.name, entity.canonical_name)
-
-        return entity
+        return get_or_create_extracted_entity(self.session, extracted)
 
     # ------------------------------------------------------------------
     # Training: Build ML categorizer from accumulated data

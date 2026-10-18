@@ -65,7 +65,10 @@ class ExtractedEntity:
     entity_type: str            # person, organization, location
     mention_count: int = 1
     context_snippets: list[str] = field(default_factory=list)
-    confidence: float = 1.0
+    confidence: float = 0.55
+    provenance: list[str] = field(default_factory=lambda: ["spacy_ner"])
+    publishable: bool = False
+    matched_aliases: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -152,6 +155,19 @@ class EntityExtractor:
         "veriut", "football", "fudbal",
     }
 
+    # Exact, observed legacy false positives. These are intentionally narrower
+    # than the general quality rules because the migration may hide them without
+    # human review; all other model discoveries are only queued for review.
+    EXPLICIT_NOISE_NAMES = {
+        "një", "sipas", "çfarë", "burimi", "portali", "ndërkohë",
+        "etiketat", "këto", "shënim", "dërgoni", "gjithashtu", "ndërsa",
+        "nëse", "edhe", "ligjin", "vendimi", "shtetit", "është", "kështu",
+        "kryetari", "агенцијата", "центарот", "водата", "следете", "законот",
+        "иако", "flaka dossier epstein", "flaka media",
+        "flaka flaka", "redaksia flaka flaka ai", "media sociale",
+        "ai media sociale",
+    }
+
     SUSPICIOUS_PHRASE_PATTERNS = [
         re.compile(pattern, re.IGNORECASE) for pattern in [
             r"\b(according|instead|because|after|before|latest)\b",
@@ -216,7 +232,9 @@ class EntityExtractor:
 
         # Always try English model
         try:
-            self._nlp_models["en"] = spacy.load("en_core_web_sm")
+            self._nlp_models["en"] = self._ensure_sentence_boundaries(
+                spacy.load("en_core_web_sm")
+            )
             logger.info("loaded_spacy_model", model="en_core_web_sm")
         except OSError:
             logger.warning("spacy_model_not_found", model="en_core_web_sm")
@@ -225,10 +243,19 @@ class EntityExtractor:
         non_en = [l for l in self._languages if l != "en"]
         if non_en:
             try:
-                self._nlp_models["xx"] = spacy.load("xx_ent_wiki_sm")
+                self._nlp_models["xx"] = self._ensure_sentence_boundaries(
+                    spacy.load("xx_ent_wiki_sm")
+                )
                 logger.info("loaded_spacy_model", model="xx_ent_wiki_sm")
             except OSError:
                 logger.warning("spacy_model_not_found", model="xx_ent_wiki_sm")
+
+    @staticmethod
+    def _ensure_sentence_boundaries(nlp):
+        """Add a lightweight sentence segmenter when a model provides none."""
+        if not {"parser", "senter", "sentencizer"}.intersection(nlp.pipe_names):
+            nlp.add_pipe("sentencizer")
+        return nlp
 
     def extract(
         self,
@@ -290,6 +317,10 @@ class EntityExtractor:
                     "entity_type": entity_type,
                     "count": 0,
                     "contexts": [],
+                    "confidence": 0.55,
+                    "provenance": {"spacy_ner"},
+                    "publishable": False,
+                    "matched_aliases": set(),
                 }
 
             raw_entities[canonical]["count"] += 1
@@ -315,6 +346,10 @@ class EntityExtractor:
                 entity_type=e["entity_type"],
                 mention_count=e["count"],
                 context_snippets=e["contexts"],
+                confidence=float(e.get("confidence", 0.55)),
+                provenance=sorted(e.get("provenance") or {"spacy_ner"}),
+                publishable=bool(e.get("publishable", False)),
+                matched_aliases=sorted(e.get("matched_aliases") or []),
             )
             for e in sorted_entities
         ]
@@ -354,6 +389,7 @@ class EntityExtractor:
             names = [item.name, *item.aliases]
             contexts: list[str] = []
             spans: list[tuple[int, int]] = []
+            matched_aliases: set[str] = set()
             for alias in sorted(names, key=len, reverse=True):
                 pattern = re.compile(rf"(?<!\w){re.escape(alias)}(?!\w)", re.IGNORECASE)
                 for match in pattern.finditer(text):
@@ -361,6 +397,7 @@ class EntityExtractor:
                     if any(span[0] < end and span[1] > start for start, end in spans):
                         continue
                     spans.append(span)
+                    matched_aliases.add(alias)
                     context = self._context_for_span(match.start(), match.end(), sentence_texts)
                     if context and context not in contexts:
                         contexts.append(context)
@@ -373,11 +410,20 @@ class EntityExtractor:
                     "count": len(spans),
                     "contexts": contexts[:3],
                     "lexicon": True,
+                    "confidence": 1.0,
+                    "provenance": {"curated_lexicon"},
+                    "publishable": True,
+                    "matched_aliases": matched_aliases,
                     "matched_names": {
                         self._canonicalize(value) for value in names
                     },
                 }
         return raw_entities
+
+    @classmethod
+    def is_explicit_noise(cls, name: str) -> bool:
+        """Return true only for exact false positives safe to hide automatically."""
+        return cls._canonicalize(name) in cls.EXPLICIT_NOISE_NAMES
 
     @staticmethod
     def _is_covered_by_lexicon(
@@ -459,6 +505,10 @@ class EntityExtractor:
             reasons.append("numeric_or_date_like")
         if canonical in cls.STOPWORDS:
             reasons.append("stopword")
+        if canonical in cls.EXPLICIT_NOISE_NAMES:
+            reasons.append("explicit_noise")
+        if tokens and all(token in cls.EXPLICIT_NOISE_NAMES for token in tokens):
+            reasons.append("explicit_noise_phrase")
         if canonical in {
             "\u0443\u043f\u0440\u0430\u0432\u0430",
             "\u0443\u043f\u0440\u0430\u0432\u0430\u0442\u0430",
@@ -566,6 +616,19 @@ class EntityExtractor:
                     long_ent["count"] += short_ent["count"]
                     long_ent["contexts"].extend(short_ent["contexts"])
                     long_ent["contexts"] = long_ent["contexts"][:3]
+                    long_ent.setdefault("provenance", set()).update(
+                        short_ent.get("provenance") or set()
+                    )
+                    long_ent.setdefault("matched_aliases", set()).update(
+                        short_ent.get("matched_aliases") or set()
+                    )
+                    long_ent["confidence"] = max(
+                        float(long_ent.get("confidence", 0.0)),
+                        float(short_ent.get("confidence", 0.0)),
+                    )
+                    long_ent["publishable"] = bool(
+                        long_ent.get("publishable") or short_ent.get("publishable")
+                    )
                     merged_into[short_key] = long_key
 
         # Remove merged entities

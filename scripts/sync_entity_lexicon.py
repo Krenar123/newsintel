@@ -72,9 +72,22 @@ def _refresh_totals(session, entity: Entity) -> None:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--country", default="mk")
     parser.add_argument("--apply", action="store_true", help="Write changes to the database")
+    parser.add_argument(
+        "--transition-auto",
+        action="store_true",
+        help="Queue legacy AUTO entities for review and hide exact known noise",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=5000,
+        help="Maximum legacy AUTO rows to transition per run",
+    )
     args = parser.parse_args()
 
     filename = "north_macedonia.yaml" if args.country == "mk" else f"{args.country}.yaml"
@@ -103,7 +116,15 @@ def main() -> int:
     create_all_tables(engine)
     Session = get_session_factory(engine)
     session = Session()
-    stats = {"curated": 0, "created": 0, "approved": 0, "merged": 0}
+    stats = {
+        "curated": 0,
+        "created": 0,
+        "approved": 0,
+        "merged": 0,
+        "auto_curated": 0,
+        "auto_needs_review": 0,
+        "auto_hidden_noise": 0,
+    }
     actions = []
     try:
         for item in items:
@@ -160,7 +181,14 @@ def main() -> int:
                     search_text=search_blob(name, canonical, *aliases),
                     entity_type=entity_type,
                     status=EntityStatus.APPROVED,
-                    metadata_json={"aliases": aliases, "curated_country": args.country},
+                    metadata_json={
+                        "aliases": aliases,
+                        "matched_aliases": aliases,
+                        "curated_country": args.country,
+                        "provenance": ["curated_lexicon"],
+                        "confidence": 1.0,
+                        "publishable": True,
+                    },
                     review_notes="Created from curated country entity lexicon.",
                     reviewed_at=now,
                     total_mentions=0,
@@ -175,7 +203,17 @@ def main() -> int:
                 target.entity_type = entity_type
                 target.search_text = search_blob(name, canonical, *aliases)
                 metadata = dict(target.metadata_json or {})
-                metadata.update({"aliases": aliases, "curated_country": args.country})
+                provenance = metadata.get("provenance", [])
+                if isinstance(provenance, str):
+                    provenance = [provenance]
+                metadata.update({
+                    "aliases": aliases,
+                    "matched_aliases": aliases,
+                    "curated_country": args.country,
+                    "provenance": sorted({*provenance, "curated_lexicon"}),
+                    "confidence": 1.0,
+                    "publishable": True,
+                })
                 target.metadata_json = metadata
                 target.status = EntityStatus.APPROVED
                 target.review_notes = "Approved from curated country entity lexicon."
@@ -187,11 +225,41 @@ def main() -> int:
                 stats["merged"] += 1
             _refresh_totals(session, target)
 
+        if args.transition_auto:
+            legacy_auto = (
+                session.query(Entity)
+                .filter(Entity.status == EntityStatus.AUTO)
+                .order_by(Entity.id.asc())
+                .limit(max(args.batch_size, 1))
+                .all()
+            )
+            for entity in legacy_auto:
+                canonical = EntityExtractor._canonicalize(entity.name)
+                if canonical in owner_by_alias:
+                    # The curated sync above owns this record. In dry-run mode,
+                    # report it separately instead of misclassifying it.
+                    stats["auto_curated"] += 1
+                    continue
+                if EntityExtractor.is_explicit_noise(entity.name):
+                    stats["auto_hidden_noise"] += 1
+                    if args.apply:
+                        entity.status = EntityStatus.HIDDEN
+                        entity.review_notes = "Hidden by exact legacy-noise migration rule."
+                        entity.reviewed_at = datetime.datetime.utcnow()
+                    continue
+                stats["auto_needs_review"] += 1
+                if args.apply:
+                    entity.status = EntityStatus.NEEDS_REVIEW
+                    entity.review_notes = "Queued by precision-first legacy AUTO migration."
+
         session.commit()
         mode = "Applied" if args.apply else "Dry run"
         print(
             f"{mode}: curated={stats['curated']} created={stats['created']} "
-            f"approved={stats['approved']} merged={stats['merged']}"
+            f"approved={stats['approved']} merged={stats['merged']} "
+            f"auto_curated={stats['auto_curated']} "
+            f"auto_needs_review={stats['auto_needs_review']} "
+            f"auto_hidden_noise={stats['auto_hidden_noise']}"
         )
         if not args.apply:
             for action in actions[:30]:
@@ -200,7 +268,7 @@ def main() -> int:
                         f"  {action['name']}: target={action['target']} "
                         f"merge={action['merge_count']}"
                     )
-            print("Add --apply to approve and merge these curated records.")
+            print("Add --apply to approve/merge curated records and apply requested transitions.")
         return 0
     except Exception:
         session.rollback()

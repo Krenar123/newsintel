@@ -55,7 +55,12 @@ from src.models.database import (
 )
 from src.search.engine import SearchEngine, SearchFilters
 from src.search.normalization import search_variants
-from src.search.predicates import article_text_match, entity_text_match
+from src.search.predicates import (
+    article_text_match,
+    client_publishable_entity_filter,
+    entity_text_match,
+    is_client_publishable_entity,
+)
 from src.processing.pipeline import ProcessingPipeline
 from src.ingestion.rss_fetcher import RSSFetcher
 from src.ingestion.scraper import ArticleScraper
@@ -312,7 +317,7 @@ def article_to_response(article: Article) -> ArticleResponse:
                 context=m.context_snippet,
             )
             for m in article.entity_mentions
-            if m.entity and m.entity.status != EntityStatus.HIDDEN
+            if is_client_publishable_entity(m.entity)
             and is_likely_entity_name(m.entity.name, m.entity.entity_type.value)
         ],
     )
@@ -327,6 +332,13 @@ def _active_article_query(query):
 
 
 def _entity_to_response(entity: Entity) -> EntityResponse:
+    metadata = entity.metadata_json or {}
+    provenance = metadata.get("provenance", [])
+    if isinstance(provenance, str):
+        provenance = [provenance]
+    matched_aliases = metadata.get("matched_aliases", metadata.get("aliases", []))
+    if isinstance(matched_aliases, str):
+        matched_aliases = [matched_aliases]
     return EntityResponse(
         id=entity.id,
         name=entity.name,
@@ -334,6 +346,10 @@ def _entity_to_response(entity: Entity) -> EntityResponse:
         entity_type=corrected_entity_type(entity.name, entity.entity_type.value),
         status=entity.status.value if entity.status else "auto",
         review_notes=entity.review_notes,
+        provenance=provenance,
+        confidence=metadata.get("confidence"),
+        publishable=is_client_publishable_entity(entity),
+        matched_aliases=matched_aliases,
         total_mentions=entity.total_mentions,
         first_seen_at=entity.first_seen_at,
         last_seen_at=entity.last_seen_at,
@@ -907,20 +923,7 @@ def list_entities(
     etype = EntityType(entity_type) if entity_type else None
     entities = search.search_entities(q or "", entity_type=etype, limit=limit)
 
-    return [
-        EntityResponse(
-            id=e.id,
-            name=e.name,
-            canonical_name=e.canonical_name,
-            entity_type=corrected_entity_type(e.name, e.entity_type.value),
-            status=e.status.value if e.status else "auto",
-            review_notes=e.review_notes,
-            total_mentions=e.total_mentions,
-            first_seen_at=e.first_seen_at,
-            last_seen_at=e.last_seen_at,
-        )
-        for e in entities
-    ]
+    return [_entity_to_response(entity) for entity in entities]
 
 
 @app.get("/api/v1/entities/{entity_id}/articles",
@@ -940,17 +943,7 @@ def get_entity_articles(
 
     entity = result["entity"]
     return EntityDetailResponse(
-        entity=EntityResponse(
-            id=entity.id,
-            name=entity.name,
-            canonical_name=entity.canonical_name,
-            entity_type=corrected_entity_type(entity.name, entity.entity_type.value),
-            status=entity.status.value if entity.status else "auto",
-            review_notes=entity.review_notes,
-            total_mentions=entity.total_mentions,
-            first_seen_at=entity.first_seen_at,
-            last_seen_at=entity.last_seen_at,
-        ),
+        entity=_entity_to_response(entity),
         articles=[
             EntityArticle(
                 article_id=item["article"].id,
@@ -1498,7 +1491,7 @@ def get_related_entities(
 ):
     """Get entities that frequently appear in the same articles."""
     entity = db.query(Entity).get(entity_id)
-    if not entity:
+    if not is_client_publishable_entity(entity):
         raise HTTPException(status_code=404, detail="Entity not found")
 
     article_ids = select(EntityMention.article_id).where(
@@ -1517,7 +1510,7 @@ def get_related_entities(
         .filter(
             EntityMention.article_id.in_(article_ids),
             Entity.id != entity_id,
-            Entity.status != EntityStatus.HIDDEN,
+            client_publishable_entity_filter(),
         )
         .group_by(Entity.id, Entity.name, Entity.entity_type)
         .order_by(desc("shared_articles"), desc("mention_count"))
@@ -1545,7 +1538,7 @@ def get_entity_briefing(
 ):
     """Entity dossier briefing with timeline, source coverage, evidence, and copy text."""
     entity = db.query(Entity).get(entity_id)
-    if not entity:
+    if not is_client_publishable_entity(entity):
         raise HTTPException(status_code=404, detail="Entity not found")
 
     since = datetime.datetime.utcnow() - datetime.timedelta(days=days)
@@ -1672,7 +1665,7 @@ def generate_entity_briefing_report(
 ):
     """Generate a PDF dossier for a single entity profile."""
     entity = db.query(Entity).get(entity_id)
-    if not entity:
+    if not is_client_publishable_entity(entity):
         raise HTTPException(status_code=404, detail="Entity not found")
 
     payload = jsonable_encoder(get_entity_briefing(entity_id, days, db))
@@ -1776,8 +1769,7 @@ def get_topic_briefing(
         for mention in article.entity_mentions:
             entity = mention.entity
             if (
-                not entity
-                or entity.status == EntityStatus.HIDDEN
+                not is_client_publishable_entity(entity)
                 or not is_likely_entity_name(entity.name, entity.entity_type.value)
             ):
                 continue
@@ -8820,7 +8812,7 @@ def _top_entities_for_articles(db: Session, articles: list[Article]) -> list[dic
         )
         .join(EntityMention, EntityMention.entity_id == Entity.id)
         .filter(EntityMention.article_id.in_(article_ids))
-        .filter(Entity.status != EntityStatus.HIDDEN)
+        .filter(client_publishable_entity_filter())
         .group_by(Entity.id, Entity.name, Entity.entity_type)
         .order_by(desc("mentions"))
         .limit(10)
@@ -9384,7 +9376,7 @@ def _attack_detail_for_article(
     candidate_attackers = []
     for mention in article.entity_mentions:
         entity = mention.entity
-        if not entity or entity.status == EntityStatus.HIDDEN:
+        if not is_client_publishable_entity(entity):
             continue
         entity_type = corrected_entity_type(entity.name, entity.entity_type.value)
         if entity_type not in (EntityType.PERSON.value, EntityType.ORGANIZATION.value):
