@@ -23,10 +23,10 @@ test("political figure receives a personalized, responsive workspace", async ({ 
   await signIn(page, "mickoski@newsintel.local", "Demo123!", "Defense Desk");
 
   await expect(page.getByRole("heading", { name: "What needs your attention" })).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByText("Who is criticizing you?", { exact: true })).toBeVisible();
-  await expect(page.getByText("Recent coverage", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Main critic identified|No supported attack pattern is active/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Latest mentions about you" })).toBeVisible();
   await expect(page.getByText("Pilot readiness", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("These are recent mentions. They are not automatically classified as attacks.")).toBeVisible();
+  await expect(page.getByText("Mentions are shown separately from verified risks.")).toBeVisible();
   await expect(page.getByLabel("Search people, topics, and articles")).toHaveCount(0);
 
   await page.getByRole("button", { name: "7 days", exact: true }).click();
@@ -34,16 +34,16 @@ test("political figure receives a personalized, responsive workspace", async ({ 
   await expect(page.getByText("Last week", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What needs your attention" })).toBeVisible({ timeout: 90_000 });
 
-  await page.getByRole("button", { name: /^Attacks/ }).click();
-  await expect(page.getByRole("heading", { name: "Why you are being attacked" })).toBeVisible();
+  await page.getByRole("button", { name: /^Risks/ }).click();
+  await expect(page.getByRole("heading", { name: "Claims that may need a response" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What needs your attention" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: /^Portals/ }).click();
-  await expect(page.getByRole("heading", { name: "Attack coverage by portal" })).toBeVisible();
-  await expect(page.getByText("Ordinary mentions are excluded.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: /^Mentions/ }).click();
+  await expect(page.getByRole("heading", { name: "Everything being said about you" })).toBeVisible();
+  await expect(page.getByText("A mention is not automatically an attack.", { exact: false })).toBeVisible();
 
   await page.getByRole("button", { name: /^Cases/ }).click();
-  await expect(page.getByRole("heading", { name: "Saved attacks and response history" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Saved evidence and response history" })).toBeVisible();
 
   const horizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth,

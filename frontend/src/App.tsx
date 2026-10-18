@@ -3194,6 +3194,10 @@ export function App() {
   const staffWorkspaceDataEnabled = Boolean(
     currentUser && currentUser.role !== "client"
   );
+  const staffAccess = currentUser?.role === "admin" || currentUser?.role === "analyst";
+  const adminPageDataEnabled = currentUser?.role === "admin" && view === "admin";
+  const adminOperationsDataEnabled = currentUser?.role === "admin" && (view === "overview" || view === "admin");
+  const clientPageDataEnabled = currentUser?.role === "client" || (staffAccess && view === "clients");
 
   const health = useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 60_000 });
   const countries = useQuery({ queryKey: ["countries"], queryFn: api.countries });
@@ -3245,7 +3249,7 @@ export function App() {
     queryFn: () => api.topicBriefing(search),
     enabled: staffWorkspaceDataEnabled && search.trim().length >= 2,
   });
-  const trends = useQuery({ queryKey: ["trends"], queryFn: api.trends, enabled: staffWorkspaceDataEnabled });
+  const trends = useQuery({ queryKey: ["trends"], queryFn: api.trends, enabled: staffWorkspaceDataEnabled && (view === "trends" || view === "demo") });
   const storyClusters = useQuery({
     queryKey: ["story-clusters", storyClusterStatusFilter, storyClusterDays],
     queryFn: () => api.storyClusters({
@@ -3271,124 +3275,123 @@ export function App() {
     enabled: staffWorkspaceDataEnabled,
   });
   const alerts = useQuery({ queryKey: ["alerts"], queryFn: api.alerts, enabled: staffWorkspaceDataEnabled });
-  const staffAccess = currentUser?.role === "admin" || currentUser?.role === "analyst";
   const clients = useQuery({
     queryKey: ["clients"],
     queryFn: api.clients,
-    enabled: staffAccess,
+    enabled: staffAccess && view === "clients",
   });
   const facebookPages = useQuery({
     queryKey: ["facebook-pages"],
     queryFn: api.facebookPages,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const legalDocuments = useQuery({
     queryKey: ["legal-documents", legalSearch],
     queryFn: () => api.legalDocuments(legalSearch),
-    enabled: staffAccess,
+    enabled: adminPageDataEnabled,
   });
   const legalQuality = useQuery<LegalQuality>({
     queryKey: ["legal-quality"],
     queryFn: api.legalQuality,
-    enabled: staffAccess,
+    enabled: adminPageDataEnabled,
   });
   const facebookStatus = useQuery({
     queryKey: ["facebook-status"],
     queryFn: api.facebookStatus,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const ingestionRuns = useQuery({
     queryKey: ["ingestion-runs"],
     queryFn: api.ingestionRuns,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const schedulerStatus = useQuery({
     queryKey: ["scheduler-status"],
     queryFn: api.schedulerStatus,
-    enabled: currentUser?.role === "admin",
+    enabled: adminOperationsDataEnabled,
     refetchInterval: 60_000,
   });
   const liveOps = useQuery<LiveOpsStatus>({
     queryKey: ["live-ops"],
     queryFn: api.liveOps,
-    enabled: currentUser?.role === "admin",
+    enabled: adminOperationsDataEnabled,
     refetchInterval: 60_000,
   });
   const backups = useQuery<BackupStatus>({
     queryKey: ["backups"],
     queryFn: api.backups,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const launchChecklist = useQuery<LaunchChecklist>({
     queryKey: ["launch-checklist"],
     queryFn: api.launchChecklist,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
     refetchInterval: 60_000,
   });
   const clientBriefReadiness = useQuery({
     queryKey: ["client-brief-readiness"],
     queryFn: api.clientBriefReadiness,
-    enabled: staffAccess,
+    enabled: staffAccess && view === "clients",
   });
   const sourceHealth = useQuery<IngestionSourceHealth>({
     queryKey: ["source-health"],
     queryFn: api.sourceHealth,
-    enabled: currentUser?.role === "admin",
+    enabled: adminOperationsDataEnabled,
   });
   const sourceReliability = useQuery<SourceReliability>({
     queryKey: ["source-reliability"],
     queryFn: api.sourceReliability,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const sourceConfigValidation = useQuery<SourceConfigValidation>({
     queryKey: ["source-config-validation"],
     queryFn: api.sourceConfigValidation,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const articleQuality = useQuery<ArticleQualityAudit>({
     queryKey: ["article-quality"],
     queryFn: api.articleQuality,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const intelligenceQA = useQuery<IntelligenceQA>({
     queryKey: ["intelligence-qa"],
     queryFn: api.intelligenceQA,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const opsFixQueue = useQuery<OpsFixQueue>({
     queryKey: ["ops-fix-queue"],
     queryFn: api.opsFixQueue,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const entityReviewQueue = useQuery({
     queryKey: ["entity-review"],
     queryFn: () => api.entityReviewQueue(),
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const entityQualityReport = useQuery<EntityQualityReport>({
     queryKey: ["entity-quality-report"],
     queryFn: api.entityQualityReport,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const attackReviewQueue = useQuery<AttackReviewQueue>({
     queryKey: ["attack-review-queue"],
     queryFn: api.attackReviewQueue,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const searchQuality = useQuery<SearchQuality>({
     queryKey: ["search-quality"],
     queryFn: api.searchQuality,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const entityLexiconCoverage = useQuery<EntityLexiconCoverage>({
     queryKey: ["entity-lexicon-coverage"],
     queryFn: api.entityLexiconCoverage,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const users = useQuery({
     queryKey: ["users"],
     queryFn: api.users,
-    enabled: currentUser?.role === "admin",
+    enabled: adminPageDataEnabled,
   });
   const activeClientId = currentUser?.role === "client"
     ? currentUser.client_id ?? undefined
@@ -3396,53 +3399,42 @@ export function App() {
   const clientDashboard = useQuery({
     queryKey: ["client-dashboard", activeClientId, clientWindowDays],
     queryFn: () => api.clientDashboard(activeClientId!, clientWindowDays),
-    enabled: Boolean(activeClientId),
+    enabled: Boolean(activeClientId && clientPageDataEnabled),
   });
   const clientDailyBrief = useQuery({
     queryKey: ["client-daily-brief", activeClientId],
     queryFn: () => api.clientDailyBrief(activeClientId!),
-    enabled: Boolean(
-      activeClientId
-      && clientDashboard.data?.client.client_type
-      && clientDashboard.data.client.client_type !== "political_figure"
-    ),
+    enabled: Boolean(activeClientId && clientPageDataEnabled && clientDashboard.data?.client.client_type && clientDashboard.data.client.client_type !== "political_figure"),
   });
   const savedTopics = useQuery<SavedTopicWatch[]>({
     queryKey: ["client-saved-topics", activeClientId],
     queryFn: () => api.clientSavedTopics(activeClientId!),
-    enabled: Boolean(
-      activeClientId
-      && clientDashboard.data?.client.client_type
-      && clientDashboard.data.client.client_type !== "political_figure"
-    ),
+    enabled: Boolean(activeClientId && clientPageDataEnabled && clientDashboard.data?.client.client_type && clientDashboard.data.client.client_type !== "political_figure"),
   });
   const reports = useQuery({
     queryKey: ["reports", activeClientId, currentUser?.role],
     queryFn: () => api.reports(currentUser?.role === "admin" || currentUser?.role === "analyst" ? activeClientId : undefined),
-    enabled: Boolean(
-      currentUser
-      && (currentUser.role !== "client" || clientDashboard.data)
-    ),
+    enabled: Boolean(clientPageDataEnabled && currentUser && (currentUser.role !== "client" || clientDashboard.data)),
   });
   const subscriptions = useQuery<Subscription[]>({
     queryKey: ["subscriptions"],
     queryFn: api.subscriptions,
-    enabled: staffAccess,
+    enabled: staffAccess && view === "clients",
   });
   const savedBriefings = useQuery<SavedBriefing[]>({
     queryKey: ["saved-briefings", activeClientId],
     queryFn: () => api.savedBriefings(activeClientId!),
-    enabled: Boolean(activeClientId && clientDashboard.data),
+    enabled: Boolean(activeClientId && clientPageDataEnabled && clientDashboard.data),
   });
   const incidents = useQuery({
     queryKey: ["client-incidents", activeClientId],
     queryFn: () => api.incidents(activeClientId!),
-    enabled: Boolean(activeClientId && clientDashboard.data),
+    enabled: Boolean(activeClientId && clientPageDataEnabled && clientDashboard.data),
   });
   const evidence = useQuery({
     queryKey: ["incident-evidence", activeClientId, selectedIncident?.id],
     queryFn: () => api.evidence(activeClientId!, selectedIncident!.id),
-    enabled: Boolean(activeClientId && selectedIncident?.id),
+    enabled: Boolean(activeClientId && clientPageDataEnabled && selectedIncident?.id),
   });
 
   const articleData = articles.data?.articles ?? [];
@@ -7612,7 +7604,8 @@ export function App() {
                     ))}
                   </div>
                 </div>
-                <div className={`metric-grid compact-metrics ${isPoliticalFigureClient ? "figure-metrics" : ""}`}>
+                {!isPoliticalFigureClient ? (
+                <div className="metric-grid compact-metrics">
                   <Metric
                     label={clientMetricLabels(clientDash?.client, clientWindowDays)[0].label}
                     value={clientDash?.metrics.watchlist_items ?? "-"}
@@ -7639,6 +7632,7 @@ export function App() {
                     icon={BookOpenText}
                   />
                 </div>
+                ) : null}
 
                 <div className={`client-tabbar ${isPoliticalFigureClient ? "figure-tabs" : ""}`}>
                   {visibleClientTabs.map(({ id, label, detail }) => (
@@ -7662,6 +7656,7 @@ export function App() {
                     selectedTab={clientTab}
                     incidents={incidentData}
                     status={[responsePackStatus, timelineStatus, incidentSaveStatus, watchlistAlertStatus].filter(Boolean).join(" ")}
+                    onSelectTab={setClientTab}
                     onResponsePack={openResponsePack}
                     onTimeline={openAttackTimeline}
                     onSaveCase={saveRiskItemAsIncident}

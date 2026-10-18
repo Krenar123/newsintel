@@ -10,6 +10,7 @@ import type {
   SavedBriefing,
   SavedTopicWatch,
 } from "./api";
+import { ArrowRight, BookOpenText, ExternalLink, MessageCircleQuestion, ShieldAlert } from "lucide-react";
 
 export type ClientTab = "setup" | "briefs" | "risks" | "cases" | "reports";
 
@@ -97,11 +98,11 @@ type WorkspaceSharedProps = {
 export function clientTabItems(client?: Client, staffAccess = false): Array<{ id: ClientTab; label: string; detail: string }> {
   if (client?.client_type === "political_figure") {
     return [
-      { id: "briefs", label: "Overview", detail: "What happened and what needs attention" },
-      { id: "risks", label: "Attacks", detail: "Why they are being attacked" },
-      { id: "reports", label: "Portals", detail: "Where the story is spreading" },
-      { id: "cases", label: "Cases", detail: "Saved incidents and evidence" },
-      ...(staffAccess ? [{ id: "setup" as ClientTab, label: "Setup", detail: "Watchlist and alerts" }] : []),
+      { id: "briefs", label: "Today", detail: "Your daily briefing" },
+      { id: "reports", label: "Mentions", detail: "Everything said about you" },
+      { id: "risks", label: "Risks", detail: "Claims that need a decision" },
+      { id: "cases", label: "Cases", detail: "Saved evidence and responses" },
+      ...(staffAccess ? [{ id: "setup" as ClientTab, label: "Monitoring", detail: "Watchlist and alerts" }] : []),
     ];
   }
   if (client?.client_type === "political_party") {
@@ -581,6 +582,7 @@ export function PoliticalFigureWorkspace({
   selectedTab,
   incidents,
   status,
+  onSelectTab,
   onResponsePack,
   onTimeline,
   onSaveCase,
@@ -597,6 +599,7 @@ export function PoliticalFigureWorkspace({
   selectedTab: ClientTab;
   incidents: Incident[];
   status?: string;
+  onSelectTab: (tab: ClientTab) => void;
   onResponsePack: (watchlistItemId: number) => void;
   onTimeline: (watchlistItemId: number) => void;
   onSaveCase: (watchlistItemId: number) => void;
@@ -609,7 +612,7 @@ export function PoliticalFigureWorkspace({
   onAskChat: (question?: string) => void;
   onNewChat: () => void;
 }) {
-  const { Panel, Pill, ArticleCard, IncidentCard } = components;
+  const { Panel, Pill, IncidentCard } = components;
 
   if (!clientDash) {
     return (
@@ -626,245 +629,323 @@ export function PoliticalFigureWorkspace({
   const attackItems = clientDash.risk_items.filter((item) => item.attack_count > 0);
   const allAttackDetails = uniqueAttackDetails(attackItems);
   const targetAttackDetails = targetRisk?.attack_details || [];
-  const attackSources = sourceBreakdownFromAttacks(allAttackDetails);
+  const mentionSources = sourceBreakdownFromArticles(clientDash.recent_articles);
   const primaryAttack = targetAttackDetails[0];
   const seriousRisk = targetRisk?.severity === "critical" || targetRisk?.severity === "high";
-  const recentMentions = clientDash.recent_articles.slice(0, 4);
-  const attackerLabel = primaryAttack?.attacker || "Attacker not confidently identified";
+  const recentMentions = clientDash.recent_articles.slice(0, 3);
+  const attackerLabel = primaryAttack?.attacker || "Speaker not yet confirmed";
   const targetLabel = primaryAttack?.target || targetRisk?.label || targetName;
+  const matchedArticleCount = clientDash.metrics.matched_articles ?? clientDash.recent_articles.length;
+
+  const renderMentionRow = (article: Article) => {
+    const summary = article.summaries?.find((item) => item.summary_type === "short")?.text
+      || article.summaries?.[0]?.text;
+
+    return (
+      <article className="figure-mention-row" key={article.id}>
+        <div className="figure-mention-copy">
+          <div className="figure-mention-meta">
+            <span>{article.source_name || article.platform_account_name || "Unknown source"}</span>
+            <span>{dateLabel(article.published_at || article.fetched_at || article.ingested_at)}</span>
+          </div>
+          <strong>{article.title}</strong>
+          {summary ? <p>{summary}</p> : null}
+        </div>
+        <div className="figure-mention-actions">
+          <button className="icon-text-button" type="button" onClick={() => onInspectArticle(article)}>
+            <BookOpenText size={16} aria-hidden="true" />
+            Summary
+          </button>
+          <a className="icon-text-link" href={article.url} target="_blank" rel="noreferrer">
+            <ExternalLink size={15} aria-hidden="true" />
+            Source
+          </a>
+        </div>
+      </article>
+    );
+  };
 
   return (
     <div className="figure-dashboard-shell">
       <section className="figure-profile-header" aria-label="Political figure workspace">
         <div>
-          <p className="eyebrow">Private intelligence desk</p>
+          <p className="eyebrow">Private media intelligence</p>
           <h3>{targetName}</h3>
-          <p>Mentions, allegations, source spread, response preparation, and saved evidence.</p>
+          <p>Your coverage, verified risks, evidence, and response tools in one focused briefing.</p>
         </div>
         <div className="figure-profile-status">
-          <span>Selected window</span>
+          <span>Current status</span>
           <strong className={seriousRisk ? "is-urgent" : "is-stable"}>
-            {seriousRisk ? "Review recommended" : "No urgent response"}
+            {seriousRisk ? "Decision needed" : "No urgent response"}
           </strong>
         </div>
       </section>
 
-      {selectedTab === "briefs" ? <>
-        <Panel
-          eyebrow="Current evidence"
-          title="What needs your attention"
-          className="figure-focus-panel"
-          action={<Pill tone={seriousRisk ? "coral" : "green"}>{targetRisk ? targetRisk.severity : "stable"}</Pill>}
-        >
-          {targetRisk && targetRisk.attack_count > 0 ? (
-            <div className="figure-incident-card">
-              <div className="figure-incident-heading">
-                <div>
-                  <span>Who is criticizing you?</span>
-                  <strong>{attackerLabel}</strong>
-                </div>
-                <div className="figure-incident-count">
-                  <strong>{targetRisk.attack_count}</strong>
-                  <span>flagged reports</span>
-                </div>
-              </div>
-              <div className="figure-fact-grid">
-                <div>
-                  <span>Target</span>
-                  <strong>{targetLabel}</strong>
-                </div>
-                <div>
-                  <span>Why?</span>
-                  <strong>{attackThemes(targetRisk)[0] || "Targeted negative coverage"}</strong>
-                </div>
-                <div>
-                  <span>Confirmed portals</span>
-                  <strong>{new Set(targetAttackDetails.map((detail) => detail.reported_by)).size}</strong>
-                </div>
-                <div>
-                  <span>Latest report</span>
-                  <strong>{dateLabel(primaryAttack?.published_at || targetRisk.latest_at)}</strong>
-                </div>
-              </div>
-              <p className="figure-plain-summary">{attackExplanation(targetRisk)}</p>
-              <div className="figure-action-row">
-                <button className="primary-button" type="button" onClick={() => onResponsePack(targetRisk.watchlist_item_id)}>
-                  Prepare sourced response
-                </button>
-                <button className="secondary-button" type="button" onClick={() => onTimeline(targetRisk.watchlist_item_id)}>
-                  Open timeline
-                </button>
-                <button className="secondary-button" type="button" onClick={() => onSaveCase(targetRisk.watchlist_item_id)}>
-                  Save evidence case
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="figure-clear-state">
-              <strong>No supported attack pattern is active.</strong>
-              <p>Recent mentions remain available below. A public response is not recommended without a specific sourced allegation.</p>
-            </div>
-          )}
-        </Panel>
-
-        <Panel eyebrow="Attack Evidence" title="Reports tied to this allegation">
-          <div className="figure-evidence-list">
-            {targetAttackDetails.length ? targetAttackDetails.slice(0, 5).map((detail) => (
-              <article className="figure-evidence-row" key={detail.article_id}>
-                <div className="figure-evidence-meta">
-                  <Pill>{detail.reported_by}</Pill>
-                  <span>{dateLabel(detail.published_at)}</span>
-                  <span>{detail.confidence_label} confidence</span>
-                </div>
-                <strong>{detail.title}</strong>
-                <p>{detail.attacker ? `${detail.attacker} is identified as the speaker or critic.` : "The critic could not be identified confidently from the stored text."}</p>
-                <details>
-                  <summary>Show original-language allegation</summary>
-                  <p>{detail.allegation || detail.quote || "No exact allegation extract was preserved."}</p>
-                </details>
-                <a href={detail.url} target="_blank" rel="noreferrer">Open original article</a>
-              </article>
-            )) : <div className="empty-state">No article is confidently tied to an attack. Recent mentions are not presented as attack evidence.</div>}
-          </div>
-        </Panel>
-
-        <details className="figure-chat-disclosure">
-          <summary>
-            <span>Ask NewsIntel</span>
-            <strong>Search your private coverage and prepare a cited answer</strong>
-          </summary>
-          <ClientChatPanel
-            components={{ Panel, Pill }}
-            title="Ask anything about your coverage"
-            description="Ask about latest mentions, who is mentioning you, why an attack is spreading, or how to prepare a sourced response."
-            placeholder="Example: Who criticized me in this period and what evidence do we have?"
-            prompts={[
-              "What is the latest about me?",
-              "Who is mentioning me the most?",
-              "Why am I being attacked?",
-              "Help me prepare a response.",
-            ]}
-            chatQuestion={chatQuestion}
-            chatAnswer={chatAnswer}
-            chatStatus={chatStatus}
-            onChatQuestionChange={onChatQuestionChange}
-            onAskChat={onAskChat}
-            onNewChat={onNewChat}
-          />
-        </details>
-      </> : null}
+      <section className="figure-snapshot-strip" aria-label="Coverage snapshot">
+        <div>
+          <span>Mentions</span>
+          <strong>{matchedArticleCount}</strong>
+        </div>
+        <div>
+          <span>News sources</span>
+          <strong>{mentionSources.length}</strong>
+        </div>
+        <div>
+          <span>Sourced risk reports</span>
+          <strong>{allAttackDetails.length}</strong>
+        </div>
+        <div>
+          <span>Saved cases</span>
+          <strong>{incidents.length}</strong>
+        </div>
+      </section>
 
       {selectedTab === "briefs" ? (
-        <Panel eyebrow="Recent Mentions" title="Latest coverage about you">
-          <p className="panel-intro">These are recent mentions. They are not automatically classified as attacks.</p>
-          <div className="article-list compact figure-article-list">
-            {recentMentions.length ? recentMentions.map((article) => (
-              <ArticleCard article={article} key={article.id} onInspect={onInspectArticle} />
-            )) : <div className="empty-state">No matched articles in this period.</div>}
+        <>
+          <div className="figure-today-layout">
+            <Panel
+              eyebrow="Priority now"
+              title="What needs your attention"
+              className={`figure-focus-panel ${seriousRisk ? "is-urgent" : "is-calm"}`}
+              action={<Pill tone={seriousRisk ? "coral" : "green"}>{targetRisk?.severity || "stable"}</Pill>}
+            >
+              {targetRisk && targetRisk.attack_count > 0 ? (
+                <div className="figure-decision-brief">
+                  <div className="figure-decision-heading">
+                    <ShieldAlert size={22} aria-hidden="true" />
+                    <div>
+                      <span>Main critic identified</span>
+                      <strong>{attackerLabel}</strong>
+                    </div>
+                  </div>
+                  <p className="figure-decision-summary">{attackExplanation(targetRisk)}</p>
+                  <dl className="figure-decision-facts">
+                    <div>
+                      <dt>What is the claim about?</dt>
+                      <dd>{attackThemes(targetRisk)[0] || "Targeted negative coverage"}</dd>
+                    </div>
+                    <div>
+                      <dt>Who is targeted?</dt>
+                      <dd>{targetLabel}</dd>
+                    </div>
+                    <div>
+                      <dt>How far has it spread?</dt>
+                      <dd>{new Set(targetAttackDetails.map((detail) => detail.reported_by)).size} portals, {targetRisk.attack_count} flagged reports</dd>
+                    </div>
+                    <div>
+                      <dt>Latest evidence</dt>
+                      <dd>{dateLabel(primaryAttack?.published_at || targetRisk.latest_at)}</dd>
+                    </div>
+                  </dl>
+                  {primaryAttack?.allegation || primaryAttack?.quote ? (
+                    <blockquote className="figure-claim-preview">
+                      <span>Stored allegation</span>
+                      <p>{primaryAttack.allegation || primaryAttack.quote}</p>
+                    </blockquote>
+                  ) : null}
+                  <div className="figure-action-row">
+                    <button className="primary-button" type="button" onClick={() => onResponsePack(targetRisk.watchlist_item_id)}>
+                      Build a sourced response
+                    </button>
+                    <button className="secondary-button" type="button" onClick={() => onTimeline(targetRisk.watchlist_item_id)}>
+                      Open timeline
+                    </button>
+                    <button className="text-button" type="button" onClick={() => onSelectTab("risks")}>
+                      Review all risks
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="figure-clear-state">
+                  <strong>No supported attack pattern is active.</strong>
+                  <p>Continue monitoring recent mentions. A public response is not recommended without a specific, sourced allegation.</p>
+                  <button className="text-button" type="button" onClick={() => onSelectTab("reports")}>Review mentions</button>
+                </div>
+              )}
+            </Panel>
+
+            <section className="figure-assistant-card" aria-labelledby="figure-assistant-title">
+              <div className="figure-assistant-heading">
+                <MessageCircleQuestion size={22} aria-hidden="true" />
+                <div>
+                  <p className="eyebrow">Private research</p>
+                  <h3 id="figure-assistant-title">Ask about your coverage</h3>
+                </div>
+                {chatAnswer ? <button className="text-button" type="button" onClick={onNewChat}>Clear</button> : null}
+              </div>
+              <p>Ask what happened, who said it, how the story spread, or what evidence supports a response.</p>
+              <form
+                className="figure-assistant-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onAskChat();
+                }}
+              >
+                <textarea
+                  value={chatQuestion}
+                  onChange={(event) => onChatQuestionChange(event.target.value)}
+                  placeholder="Ask a question about your coverage..."
+                  rows={3}
+                  aria-label="Ask about your coverage"
+                />
+                <button className="primary-button" type="submit">
+                  Ask
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              </form>
+              <div className="figure-question-list" aria-label="Suggested questions">
+                {[
+                  "What is the latest about me?",
+                  "Who is criticizing me and why?",
+                  "Which portals are spreading this?",
+                  "What can I safely say in response?",
+                ].map((prompt) => (
+                  <button type="button" key={prompt} onClick={() => onAskChat(prompt)}>{prompt}</button>
+                ))}
+              </div>
+              {chatStatus ? <p className="figure-assistant-status">{chatStatus}</p> : null}
+              {chatAnswer ? (
+                <div className="figure-assistant-answer" aria-live="polite">
+                  <div className="card-meta">
+                    <Pill tone={chatAnswer.confidence.level === "high" ? "green" : chatAnswer.confidence.level === "medium" ? "gold" : "coral"}>
+                      {chatAnswer.confidence.level || "unknown"} confidence
+                    </Pill>
+                    <Pill>{chatAnswer.confidence.source_count ?? 0} sources</Pill>
+                  </div>
+                  {chatAnswer.summary.split("\n").filter(Boolean).slice(0, 3).map((line) => <p key={line}>{line}</p>)}
+                  {chatAnswer.citations.length ? (
+                    <details>
+                      <summary>View cited evidence ({chatAnswer.citations.length})</summary>
+                      <div className="mini-source-list">
+                        {chatAnswer.citations.slice(0, 5).map((item) => (
+                          <a href={item.url || undefined} target="_blank" rel="noreferrer" key={item.article_id}>
+                            {item.source_name}: {item.claim}
+                          </a>
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
+                  {chatAnswer.restrictions.length ? <small>{chatAnswer.restrictions[0]}</small> : null}
+                </div>
+              ) : (
+                <p className="figure-assistant-note">Answers are limited to information this account is permitted to access and include source citations when evidence exists.</p>
+              )}
+            </section>
+          </div>
+
+          <section className="figure-mentions-section" aria-labelledby="latest-mentions-title">
+            <div className="section-title-row">
+              <div>
+                <p className="eyebrow">Latest coverage</p>
+                <h3 id="latest-mentions-title">Latest mentions about you</h3>
+                <p>Mentions are shown separately from verified risks.</p>
+              </div>
+              <button className="secondary-button" type="button" onClick={() => onSelectTab("reports")}>
+                See all mentions
+              </button>
+            </div>
+            <div className="figure-mention-list">
+              {recentMentions.length ? recentMentions.map(renderMentionRow) : <div className="empty-state">No matched articles in this period.</div>}
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {selectedTab === "reports" ? (
+        <Panel eyebrow="Your mentions" title="Everything being said about you">
+          <div className="figure-view-intro">
+            <p>Browse article summaries first, then open the original portal when you need the full context. A mention is not automatically an attack.</p>
+            <div className="figure-source-summary">
+              {mentionSources.slice(0, 6).map((source) => (
+                <span key={source.name}><strong>{source.name}</strong> {source.count}</span>
+              ))}
+            </div>
+          </div>
+          <div className="figure-mention-list is-full">
+            {clientDash.recent_articles.length
+              ? clientDash.recent_articles.slice(0, 20).map(renderMentionRow)
+              : <div className="empty-state">No matched articles in this period.</div>}
           </div>
         </Panel>
       ) : null}
 
       {selectedTab === "risks" ? (
-        <Panel eyebrow="Attack Analysis" title="Why you are being attacked">
-          <p className="panel-intro">Each item below separates the detected theme from the original wording and source trail.</p>
+        <Panel eyebrow="Risk decisions" title="Claims that may need a response">
+          <p className="panel-intro">Only sourced items classified as targeted criticism appear here. Review the original wording before publishing any response.</p>
           <div className="figure-risk-list">
-            {attackItems.length ? attackItems.map((item) => (
-              <article className="figure-attack-card" key={item.watchlist_item_id}>
-                <div>
-                  <div className="card-meta">
-                    <Pill tone={item.severity === "critical" || item.severity === "high" ? "coral" : "gold"}>{item.severity}</Pill>
-                    <Pill>{item.article_count} mentions reviewed</Pill>
-                    <Pill>{item.source_count} mention sources</Pill>
-                    <Pill tone="coral">{item.attack_count} sourced attacks</Pill>
-                  </div>
-                  <h3>{item.label}</h3>
-                  <p>{attackExplanation(item)}</p>
-                  <p className="muted">{item.recommended_action}</p>
-                  {item.attack_details?.length ? (
-                    <details className="attack-evidence-disclosure">
-                      <summary>Open cited allegations ({item.attack_details.length})</summary>
-                      <div className="attack-evidence-body">
-                        {item.attack_details.slice(0, 5).map((detail) => (
-                          <article className="attack-source-item" key={detail.article_id}>
-                            <strong>{detail.attacker || "Attacker not identified"} {" → "} {detail.target || item.label}</strong>
-                            <p>{detail.allegation || "No exact allegation extract was preserved."}</p>
-                            <div className="card-meta">
-                              <Pill>{detail.reported_by}</Pill>
-                              <Pill>{detail.confidence_label} confidence</Pill>
-                              <span>{dateLabel(detail.published_at)}</span>
-                            </div>
-                            <a href={detail.url} target="_blank" rel="noreferrer">Open original report</a>
-                          </article>
-                        ))}
-                      </div>
-                    </details>
-                  ) : null}
-                  {item.attack_categories && Object.keys(item.attack_categories).length ? (
-                    <div className="tag-row">
-                      {Object.entries(item.attack_categories).map(([category, count]) => (
-                        <Pill key={category} tone="gold">{category.replaceAll("_", " ")}: {count}</Pill>
-                      ))}
+            {attackItems.length ? attackItems.map((item) => {
+              const lead = item.attack_details?.[0];
+              return (
+                <article className="figure-attack-card" key={item.watchlist_item_id}>
+                  <div>
+                    <div className="card-meta">
+                      <Pill tone={item.severity === "critical" || item.severity === "high" ? "coral" : "gold"}>{item.severity}</Pill>
+                      <Pill>{item.attack_count} sourced reports</Pill>
+                      <Pill>{item.source_count} portals</Pill>
                     </div>
-                  ) : null}
-                </div>
-                <div className="figure-action-row vertical">
-                  <button className="primary-button" type="button" onClick={() => onResponsePack(item.watchlist_item_id)}>
-                    Prepare Response
-                  </button>
-                  <button className="text-button" type="button" onClick={() => onTimeline(item.watchlist_item_id)}>
-                    Timeline
-                  </button>
-                  <button className="text-button" type="button" onClick={() => onCreateAlert(item.watchlist_item_id)}>
-                    Alert Me
-                  </button>
-                  <button className="text-button" type="button" onClick={() => onSaveCase(item.watchlist_item_id)}>
-                    Save Case
-                  </button>
-                </div>
-              </article>
-            )) : <div className="empty-state">No sourced attack reports in the selected window.</div>}
+                    <h3>{lead?.attacker || "Critic not confidently identified"}</h3>
+                    <strong className="figure-risk-claim">{lead?.allegation || lead?.quote || attackExplanation(item)}</strong>
+                    <p>{attackExplanation(item)}</p>
+                    <div className="figure-risk-meta">
+                      <span>Target: {lead?.target || item.label}</span>
+                      <span>Latest: {dateLabel(lead?.published_at || item.latest_at)}</span>
+                      <span>{lead?.confidence_label || "unknown"} confidence</span>
+                    </div>
+                    {item.attack_details?.length ? (
+                      <details className="attack-evidence-disclosure">
+                        <summary>Review cited reports ({item.attack_details.length})</summary>
+                        <div className="attack-evidence-body">
+                          {item.attack_details.slice(0, 5).map((detail) => (
+                            <article className="attack-source-item" key={detail.article_id}>
+                              <strong>{detail.reported_by}: {detail.title}</strong>
+                              <p>{detail.allegation || detail.quote || "No exact allegation extract was preserved."}</p>
+                              <div className="card-meta">
+                                <Pill>{detail.confidence_label} confidence</Pill>
+                                <span>{dateLabel(detail.published_at)}</span>
+                              </div>
+                              <a href={detail.url} target="_blank" rel="noreferrer">Open original report</a>
+                            </article>
+                          ))}
+                        </div>
+                      </details>
+                    ) : null}
+                  </div>
+                  <div className="figure-action-row vertical">
+                    <button className="primary-button" type="button" onClick={() => onResponsePack(item.watchlist_item_id)}>
+                      Build response
+                    </button>
+                    <button className="secondary-button" type="button" onClick={() => onTimeline(item.watchlist_item_id)}>
+                      Timeline
+                    </button>
+                    <button className="text-button" type="button" onClick={() => onSaveCase(item.watchlist_item_id)}>
+                      Save case
+                    </button>
+                    <button className="text-button" type="button" onClick={() => onCreateAlert(item.watchlist_item_id)}>
+                      Alert me
+                    </button>
+                  </div>
+                </article>
+              );
+            }) : <div className="empty-state">No sourced risk reports in the selected window.</div>}
             {status ? <div className="empty-state">{status}</div> : null}
           </div>
         </Panel>
       ) : null}
 
-      {selectedTab === "reports" ? (
-        <Panel eyebrow="Portal Spread" title="Attack coverage by portal">
-          <p className="panel-intro">Only portals carrying a report classified as a targeted attack appear here. Ordinary mentions are excluded.</p>
-          <div className="portal-grid">
-            {attackSources.length ? attackSources.map((source) => (
-              <article className="portal-card" key={source.name}>
-                <div>
-                  <span>{source.name}</span>
-                  <strong>{source.count}</strong>
-                  <p>flagged report{source.count === 1 ? "" : "s"}<br />Latest: {dateLabel(source.latest)}</p>
-                </div>
-                <div className="mini-source-list">
-                  {source.samples.map((detail) => (
-                    <a className="portal-source-link" href={detail.url} target="_blank" rel="noreferrer" key={detail.article_id}>
-                      {detail.title}
-                    </a>
-                  ))}
-                </div>
-              </article>
-            )) : <div className="empty-state">No attack-specific portal spread is supported by the current evidence.</div>}
-          </div>
-        </Panel>
-      ) : null}
-
       {selectedTab === "cases" ? (
-        <Panel eyebrow="Case Files" title="Saved attacks and response history">
+        <Panel eyebrow="Case files" title="Saved evidence and response history">
+          <p className="panel-intro">Keep important allegations, evidence, timelines, and drafted responses together for follow-up.</p>
           <div className="alert-list">
             {incidents.length ? incidents.map((incident) => (
               <IncidentCard incident={incident} key={incident.id} />
-            )) : <div className="empty-state">No saved case files yet. Save important attack items from the Attacks tab.</div>}
+            )) : <div className="empty-state">No saved cases yet. Save a risk when it needs continued attention.</div>}
           </div>
         </Panel>
       ) : null}
 
       {selectedTab === "setup" ? (
-        <Panel eyebrow="Watchlist" title="What this desk tracks">
+        <Panel eyebrow="Monitoring" title="People and topics this desk follows">
+          <p className="panel-intro">This area is visible to authorized staff for maintaining the figure's monitoring scope and alerts.</p>
           <div className="tag-row">
             {clientDash.watchlist.map((item) => (
               <button className="text-button" key={item.id} type="button" onClick={() => onCreateAlert(item.id)}>
