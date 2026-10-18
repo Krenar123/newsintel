@@ -34,6 +34,7 @@ from src.processing.entities import (
     corrected_entity_type,
     is_likely_entity_name,
 )
+from src.processing.entity_registry import alias_value
 
 
 def main():
@@ -158,8 +159,8 @@ def _load_curated_types() -> dict[str, str]:
     for item in data.get("entities", []):
         entity_type = str(item.get("type", "")).strip()
         values = [item.get("name", ""), *(item.get("aliases", []) or [])]
-        for value in values:
-            canonical = EntityExtractor._canonicalize(str(value).strip())
+        for raw_value in values:
+            canonical = EntityExtractor._canonicalize(alias_value(raw_value))
             if canonical:
                 result[canonical] = entity_type
     return result

@@ -237,3 +237,76 @@ cases:
       - "Flaka Media"
       - "Redaksia Flaka Flaka AI"
       - "Media Sociale"
+
+
+  - id: acronym_case_sensitivity
+    language: mk
+    text: "Јас знам дека граѓанинот засади сад, но ЗНАМ испрати писмо до САД."
+    expected:
+      - {name: "ЗНАМ", type: organization}
+      - {name: "САД", type: location}
+  - id: flexible_party_punctuation
+    language: mk
+    text: "ВМРО – ДПМНЕ и СДСМ одржаа одделни прес-конференции."
+    expected:
+      - {name: "ВМРО-ДПМНЕ", type: organization}
+      - {name: "СДСМ", type: organization}
+
+  - id: name_boundaries
+    language: mk
+    text: "Мицкоски говореше во Скопје, но зборот скопјец не е име на град."
+    expected:
+      - {name: "Христијан Мицкоски", type: person}
+      - {name: "Скопје", type: location}
+
+  - id: albanian_diacritics
+    language: sq
+    text: "Izet Mexhiti u takua me Bilall Kasami në Tetovë dhe më pas në Shkup."
+    expected:
+      - {name: "Изет Меџити", type: person}
+      - {name: "Билал Касами", type: person}
+      - {name: "Тетово", type: location}
+      - {name: "Скопје", type: location}
+
+  - id: titles_do_not_create_people
+    language: mk
+    text: "Премиерот и министерот разговараа со претседателот на комисијата."
+    expected: []
+    forbidden:
+      - "Премиерот"
+      - "министерот"
+      - "претседателот"
+
+  - id: party_word_boundaries
+    language: mk
+    text: "Левица објави став, но левицата како политички поим се појави во анализата."
+    expected:
+      - {name: "Левица", type: organization}
+
+  - id: institution_longest_match
+    language: mk
+    text: "Собранието и Владата доставија податоци до Министерството за финансии."
+    expected:
+      - {name: "Собрание на Република Северна Македонија", type: organization}
+      - {name: "Влада на Република Северна Македонија", type: organization}
+      - {name: "Министерство за финансии", type: organization}
+
+  - id: duplicate_alias_same_entity
+    language: mk
+    text: "ВЛЕН, позната и како Вреди, објави заедничка листа."
+    expected:
+      - {name: "ВЛЕН", type: organization}
+
+  - id: punctuation_inside_person_name
+    language: en
+    text: "Gordana Siljanovska–Davkova met Hristijan Mickoski in Skopje."
+    expected:
+      - {name: "Гордана Силјановска-Давкова", type: person}
+      - {name: "Христијан Мицкоски", type: person}
+      - {name: "Скопје", type: location}
+
+  - id: no_substring_location
+    language: en
+    text: "The word Washingtonian must not count, but Washington should count once."
+    expected:
+      - {name: "Вашингтон", type: location}

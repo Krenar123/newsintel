@@ -6660,9 +6660,15 @@ export function App() {
                               </Pill>
                               <Pill>{entity.entity_type}</Pill>
                               <Pill tone="gold">{entity.total_mentions} mentions</Pill>
+                              <Pill>{entity.trust_tier?.replaceAll("_", " ") || "legacy"}</Pill>
+                              {entity.confidence != null ? <Pill>{Math.round(entity.confidence * 100)}% candidate score</Pill> : null}
                             </div>
                             <strong>{entity.name}</strong>
                             <p>{entity.canonical_name}</p>
+                            {entity.provenance?.length ? <p className="muted">Found by {entity.provenance.join(", ")}.</p> : null}
+                            {entity.decision_reasons?.length ? (
+                              <p className="muted">{entity.decision_reasons.map((reason) => reason.replaceAll("_", " ")).join(" · ")}</p>
+                            ) : null}
                             {entity.review_notes ? <p className="muted">{entity.review_notes}</p> : null}
                             <div className="filter-row">
                               <select

@@ -15,8 +15,10 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
 
-import yaml
 import structlog
+
+from config import settings
+from src.processing.entity_registry import EntityRegistry, canonicalize
 
 logger = structlog.get_logger()
 
@@ -69,6 +71,8 @@ class ExtractedEntity:
     provenance: list[str] = field(default_factory=lambda: ["spacy_ner"])
     publishable: bool = False
     matched_aliases: list[str] = field(default_factory=list)
+    decision_reasons: list[str] = field(default_factory=list)
+    evidence_count: int = 1
 
 
 @dataclass
@@ -79,14 +83,6 @@ class EntityExtractionResult:
     org_count: int = 0
     location_count: int = 0
     processing_time_ms: float = 0
-
-
-@dataclass
-class LexiconEntity:
-    name: str
-    canonical_name: str
-    entity_type: str
-    aliases: list[str] = field(default_factory=list)
 
 
 class EntityExtractor:
@@ -138,16 +134,48 @@ class EntityExtractor:
         "претседател", "претседателот", "премиер", "премиерот",
         "министер", "министерот", "град", "градот",
         "делегација", "делегацијата", "делегации", "делегациите",
+        "служба", "службата", "компанија", "компанијата",
+        "надлежните", "автобус", "автобусот", "почетната",
     }
+
+    PERSON_SURNAME_SUFFIXES = (
+        "ски", "ска", "ов", "ова", "ев", "ева", "оски", "оска",
+        "иќ", "ić", "iqi", "içi",
+    )
+    PERSON_CONTEXT_RE = re.compile(
+        r"\b(премиер|претседател|министер|директор|градоначалник|пратеник|"
+        r"лидер|професор|доктор|рече|изјави|соопшти|најави|обвини|побара|"
+        r"kryeminist(?:ri|re)?|president(?:i|ja)?|minist(?:ri|re)?|tha|deklaroi|"
+        r"prime minister|president|minister|director|said|stated)\b",
+        re.IGNORECASE,
+    )
+    ORGANIZATION_CONTEXT_RE = re.compile(
+        r"\b(парти(?:ја|јата)|коалици(?:ја|јата)|министерство|агенци(?:ја|јата)|"
+        r"комиси(?:ја|јата)|служб(?:а|ата)|компани(?:ја|јата)|банка|универзитет|"
+        r"телевизи(?:ја|јата)|портал|здружение|организаци(?:ја|јата)|"
+        r"parti(?:a|ja)?|koalicion|ministri|agjenci|komision|kompani|bank|"
+        r"party|coalition|ministry|agency|commission|company|bank|university)\b",
+        re.IGNORECASE,
+    )
+    LOCATION_CONTEXT_RE = re.compile(
+        r"\b(во|од|до|кон|низ|кај|преку|село(?:то)?|град(?:от)?|општин(?:а|ата)|"
+        r"në|nga|drejt|qytet(?:i)?|fshat(?:i)?|in|from|to|city|village)\b",
+        re.IGNORECASE,
+    )
 
     CONNECTOR_WORDS = {
         "и", "или", "но", "а", "во", "на", "со", "за", "од", "до",
-        "кај", "кон", "по", "пред", "без", "меѓу", "што", "дека",
+        "кај", "кон", "по", "пред", "без", "меѓу", "преку", "што", "дека",
         "затоа", "бидејќи", "според", "ако", "кога", "како",
     }
 
     SOCIAL_SHARE_WORDS = {
-        "facebook", "telegram", "viber", "whatsapp", "pinterest", "share", "x",
+        "facebook", "telegram", "viber", "whatsapp", "pinterest", "share", "tweet", "x",
+    }
+
+    MODEL_LEADING_NOISE = {
+        "победи", "следете", "прочитајте", "видете", "сподели",
+        "share", "tweet", "watch", "read",
     }
 
     UI_FRAGMENT_WORDS = {
@@ -203,32 +231,23 @@ class EntityExtractor:
         self._lexicon = self._load_lexicon()
         self._load_models()
 
-    def _load_lexicon(self) -> list[LexiconEntity]:
-        """Load curated known entities for the pilot market."""
+    def _load_lexicon(self) -> list:
+        """Load and validate the curated entity registry."""
         path = Path(__file__).resolve().parents[2] / "config" / "entities" / "north_macedonia.yaml"
-        if not path.exists():
-            return []
-        with open(path, encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-        entities = []
-        for item in data.get("entities", []):
-            name = str(item.get("name", "")).strip()
-            entity_type = str(item.get("type", "")).strip()
-            if not name or entity_type not in {"person", "organization", "location"}:
-                continue
-            aliases = [str(alias).strip() for alias in item.get("aliases", []) if str(alias).strip()]
-            entities.append(LexiconEntity(
-                name=name,
-                canonical_name=self._canonicalize(name),
-                entity_type=entity_type,
-                aliases=aliases,
-            ))
-        logger.info("loaded_entity_lexicon", count=len(entities), path=str(path))
-        return entities
+        self._registry = EntityRegistry.load(path)
+        logger.info(
+            "loaded_entity_lexicon",
+            count=len(self._registry.entities),
+            issues=len(self._registry.issues),
+            path=str(path),
+        )
+        return list(self._registry.entities)
 
     def _load_models(self):
-        """Load spaCy models for configured languages."""
+        """Load local entity candidate models configured for this worker."""
         import spacy
+
+        self._gliner = None
 
         # Always try English model
         try:
@@ -249,6 +268,19 @@ class EntityExtractor:
                 logger.info("loaded_spacy_model", model="xx_ent_wiki_sm")
             except OSError:
                 logger.warning("spacy_model_not_found", model="xx_ent_wiki_sm")
+
+        if settings.enable_gliner_ner:
+            try:
+                from gliner import GLiNER
+                self._gliner = GLiNER.from_pretrained(settings.gliner_model)
+                logger.info("loaded_gliner_model", model=settings.gliner_model)
+            except ImportError:
+                logger.error(
+                    "gliner_not_installed",
+                    hint="Install requirements-ner.txt before enabling GLiNER",
+                )
+            except Exception as exc:
+                logger.error("gliner_model_load_failed", model=settings.gliner_model, error=str(exc))
 
     @staticmethod
     def _ensure_sentence_boundaries(nlp):
@@ -283,26 +315,28 @@ class EntityExtractor:
         # Pick the right model
         nlp = self._get_model(language)
         if nlp is None:
-            logger.warning("no_ner_model_available", language=language)
-            return EntityExtractionResult(entities=[])
+            logger.warning("no_ner_model_available_using_registry", language=language)
 
-        # Process text (cap at 100k chars for performance)
-        doc = nlp(text[:100_000])
+        # Trusted registry extraction must continue even when an ML model is absent.
+        limited_text = text[:100_000]
+        raw_entities: dict[tuple[str, str], dict] = self._extract_lexicon_entities(
+            limited_text, language=language
+        )
+        doc = nlp(limited_text) if nlp is not None else None
+        sentences = list(doc.sents) if doc is not None else []
 
-        # Collect raw entities
-        raw_entities: dict[str, dict] = self._extract_lexicon_entities(text[:100_000])
-        sentences = list(doc.sents)
-
-        for ent in doc.ents:
+        for ent in doc.ents if doc is not None else []:
             # Map spaCy label to our type
             entity_type = self.LABEL_MAP.get(ent.label_)
             if not entity_type:
                 continue
 
             name = ent.text.strip()
+            context = self._get_context(ent, sentences)
 
             canonical = self._canonicalize(name)
             entity_type = self._correct_entity_type(canonical, entity_type)
+            entity_type = self._contextual_entity_type(name, entity_type, context)
 
             # Filter garbage
             if not self._is_valid_entity(name, entity_type, canonical):
@@ -310,32 +344,55 @@ class EntityExtractor:
             if self._is_covered_by_lexicon(canonical, entity_type, raw_entities):
                 continue
 
-            if canonical not in raw_entities:
-                raw_entities[canonical] = {
+            identity = (canonical, entity_type)
+            if identity not in raw_entities:
+                raw_entities[identity] = {
                     "name": name,
                     "canonical_name": canonical,
                     "entity_type": entity_type,
                     "count": 0,
                     "contexts": [],
-                    "confidence": 0.55,
+                    "confidence": 0.0,
                     "provenance": {"spacy_ner"},
                     "publishable": False,
                     "matched_aliases": set(),
+                    "decision_reasons": {"model_discovery_requires_review"},
+                    "model_votes": {"spacy_ner"},
+                    "model_score": 0.55,
+                    "spans": set(),
                 }
 
-            raw_entities[canonical]["count"] += 1
+            raw_entities[identity].setdefault("model_votes", set()).add("spacy_ner")
+            raw_entities[identity].setdefault("provenance", set()).add("spacy_ner")
+            raw_entities[identity].setdefault("spans", set()).add(
+                (int(ent.start_char), int(ent.end_char))
+            )
+            raw_entities[identity]["count"] = len(raw_entities[identity]["spans"])
 
-            # Extract context sentence
-            context = self._get_context(ent, sentences)
-            if context and len(raw_entities[canonical]["contexts"]) < 3:
-                raw_entities[canonical]["contexts"].append(context)
+            # Preserve evidence for review and sentiment.
+            if context and len(raw_entities[identity]["contexts"]) < 3:
+                raw_entities[identity]["contexts"].append(context)
 
-        # Merge similar entities (e.g., "Biden" and "Joe Biden")
+        self._extract_gliner_entities(limited_text, language, raw_entities)
+
+        # Curated aliases resolve identity; unreviewed candidates remain separate.
         merged = self._merge_similar(raw_entities)
+        admitted = []
+        for candidate in merged.values():
+            if not self._candidate_should_keep(candidate):
+                continue
+            if not candidate.get("lexicon"):
+                candidate.setdefault("decision_reasons", set()).add(
+                    "candidate_context_supported"
+                )
+            admitted.append(candidate)
+        admitted = self._resolve_type_conflicts(admitted)
 
-        # Sort by mention count, take top N
+        # Sort by mention count and review priority, then take the article cap.
         sorted_entities = sorted(
-            merged.values(), key=lambda e: e["count"], reverse=True
+            admitted,
+            key=lambda item: (item["count"], self._candidate_confidence(item)),
+            reverse=True,
         )[:max_entities]
 
         # Build result
@@ -346,10 +403,12 @@ class EntityExtractor:
                 entity_type=e["entity_type"],
                 mention_count=e["count"],
                 context_snippets=e["contexts"],
-                confidence=float(e.get("confidence", 0.55)),
+                confidence=self._candidate_confidence(e),
                 provenance=sorted(e.get("provenance") or {"spacy_ner"}),
                 publishable=bool(e.get("publishable", False)),
                 matched_aliases=sorted(e.get("matched_aliases") or []),
+                decision_reasons=sorted(e.get("decision_reasons") or []),
+                evidence_count=int(e.get("count", 1)),
             )
             for e in sorted_entities
         ]
@@ -378,47 +437,296 @@ class EntityExtractor:
             return self._nlp_models["en"]  # fallback
         return None
 
-    def _extract_lexicon_entities(self, text: str) -> dict[str, dict]:
-        """Extract curated entities and normalize aliases before ML NER results."""
-        raw_entities: dict[str, dict] = {}
+    def _extract_lexicon_entities(
+        self, text: str, *, language: str = ""
+    ) -> dict[tuple[str, str], dict]:
+        """Extract trusted aliases through the validated country registry."""
+        raw_entities: dict[tuple[str, str], dict] = {}
         if not text or not self._lexicon:
             return raw_entities
 
-        sentence_texts = self._split_sentences(text)
-        for item in self._lexicon:
-            names = [item.name, *item.aliases]
-            contexts: list[str] = []
-            spans: list[tuple[int, int]] = []
-            matched_aliases: set[str] = set()
-            for alias in sorted(names, key=len, reverse=True):
-                pattern = re.compile(rf"(?<!\w){re.escape(alias)}(?!\w)", re.IGNORECASE)
-                for match in pattern.finditer(text):
-                    span = (match.start(), match.end())
-                    if any(span[0] < end and span[1] > start for start, end in spans):
-                        continue
-                    spans.append(span)
-                    matched_aliases.add(alias)
-                    context = self._context_for_span(match.start(), match.end(), sentence_texts)
-                    if context and context not in contexts:
-                        contexts.append(context)
-
-            if spans:
-                raw_entities[item.canonical_name] = {
-                    "name": item.name,
-                    "canonical_name": item.canonical_name,
-                    "entity_type": item.entity_type,
-                    "count": len(spans),
-                    "contexts": contexts[:3],
-                    "lexicon": True,
-                    "confidence": 1.0,
-                    "provenance": {"curated_lexicon"},
-                    "publishable": True,
-                    "matched_aliases": matched_aliases,
-                    "matched_names": {
-                        self._canonicalize(value) for value in names
-                    },
-                }
+        registry = getattr(self, "_registry", None)
+        if registry is None:
+            return raw_entities
+        for match in registry.match(text, language=language):
+            key = (match.entity.canonical_name, match.entity.entity_type)
+            item = raw_entities.setdefault(key, {
+                "name": match.entity.name,
+                "canonical_name": match.entity.canonical_name,
+                "entity_type": match.entity.entity_type,
+                "count": 0,
+                "contexts": [],
+                "lexicon": True,
+                "confidence": 1.0,
+                "provenance": {"curated_lexicon"},
+                "publishable": False,
+                "matched_aliases": set(),
+                "matched_names": {
+                    self._canonicalize(alias.value) for alias in match.entity.aliases
+                },
+                "decision_reasons": {"validated_registry_alias"},
+                "model_votes": {"curated_lexicon"},
+                "model_score": 1.0,
+                "spans": set(),
+            })
+            item["spans"].add((match.start, match.end))
+            item["count"] = len(item["spans"])
+            item["matched_aliases"].add(match.alias.value)
+            item["publishable"] = bool(item["publishable"] or match.alias.publishable)
+            context = registry.context_for_span(text, match.start, match.end)
+            if context and context not in item["contexts"] and len(item["contexts"]) < 3:
+                item["contexts"].append(context)
         return raw_entities
+
+    def _extract_gliner_entities(
+        self,
+        text: str,
+        language: str,
+        raw_entities: dict[tuple[str, str], dict],
+    ) -> None:
+        """Add review-only multilingual transformer candidates to the ensemble."""
+        model = getattr(self, "_gliner", None)
+        if model is None:
+            return
+        labels = ["person", "organization", "location"]
+        limited = text[: max(500, int(settings.gliner_max_chars))]
+        for chunk, offset in self._iter_model_chunks(limited):
+            try:
+                predictions = model.predict_entities(
+                    chunk,
+                    labels,
+                    threshold=float(settings.gliner_threshold),
+                )
+            except Exception as exc:
+                logger.warning("gliner_prediction_failed", error=str(exc))
+                return
+            for prediction in predictions:
+                entity_type = str(prediction.get("label", "")).casefold()
+                if entity_type not in labels:
+                    continue
+                name = str(prediction.get("text", "")).strip()
+                start = int(prediction.get("start", 0)) + offset
+                end = int(prediction.get("end", start + len(name))) + offset
+                context = EntityRegistry.context_for_span(limited, start, end)
+                canonical = self._canonicalize(name)
+                entity_type = self._correct_entity_type(canonical, entity_type)
+                entity_type = self._contextual_entity_type(name, entity_type, context)
+                if not self._is_valid_entity(name, entity_type, canonical):
+                    continue
+                if self._is_covered_by_lexicon(canonical, entity_type, raw_entities):
+                    continue
+                identity = (canonical, entity_type)
+                candidate = raw_entities.setdefault(identity, {
+                    "name": name,
+                    "canonical_name": canonical,
+                    "entity_type": entity_type,
+                    "count": 0,
+                    "contexts": [],
+                    "confidence": 0.0,
+                    "provenance": set(),
+                    "publishable": False,
+                    "matched_aliases": set(),
+                    "decision_reasons": {"model_discovery_requires_review"},
+                    "model_votes": set(),
+                    "model_score": 0.0,
+                    "spans": set(),
+                })
+                candidate.setdefault("spans", set()).add((start, end))
+                candidate["count"] = len(candidate["spans"])
+                candidate.setdefault("provenance", set()).add("gliner_multilingual")
+                candidate.setdefault("model_votes", set()).add("gliner_multilingual")
+                candidate["model_score"] = max(
+                    float(candidate.get("model_score") or 0.0),
+                    float(prediction.get("score") or 0.0),
+                )
+                if len(candidate["model_votes"]) >= 2:
+                    candidate.setdefault("decision_reasons", set()).add("multi_model_agreement")
+                if context and context not in candidate["contexts"] and len(candidate["contexts"]) < 3:
+                    candidate["contexts"].append(context)
+
+    @staticmethod
+    def _iter_model_chunks(text: str, target_size: int = 4000):
+        cursor = 0
+        while cursor < len(text):
+            end = min(cursor + target_size, len(text))
+            if end < len(text):
+                boundary = max(
+                    text.rfind("\n", cursor + target_size // 2, end),
+                    text.rfind(".", cursor + target_size // 2, end),
+                )
+                if boundary > cursor:
+                    end = boundary + 1
+            yield text[cursor:end], cursor
+            cursor = end
+
+    @classmethod
+    def _candidate_should_keep(cls, candidate: dict) -> bool:
+        """Reject low-information model output before it reaches the review DB."""
+        if candidate.get("lexicon"):
+            return True
+        votes = set(candidate.get("model_votes") or [])
+        score = float(candidate.get("model_score") or 0.0)
+        if len(votes) >= 2 or ("gliner_multilingual" in votes and score >= 0.80):
+            return True
+        if int(candidate.get("count", 0)) >= 2:
+            return True
+
+        name = str(candidate.get("name", "")).strip()
+        tokens = [token for token in re.findall(r"[^\W_]+", name, re.UNICODE) if token]
+        context = " ".join(candidate.get("contexts") or [])
+        entity_type = str(candidate.get("entity_type", ""))
+        if not tokens:
+            return False
+
+        if tokens[0].casefold() in cls.MODEL_LEADING_NOISE:
+            return False
+        if folded_tokens := {token.casefold() for token in tokens}:
+            if folded_tokens <= cls.SOCIAL_SHARE_WORDS:
+                return False
+
+        if entity_type == "person":
+            if len(tokens) >= 2:
+                allowed_particles = {"de", "del", "der", "van", "von", "bin", "al"}
+                return (
+                    tokens[0].casefold() not in cls.CONNECTOR_WORDS
+                    and all(
+                        token[:1].isupper() or token.casefold() in allowed_particles
+                        for token in tokens
+                    )
+                )
+            folded = tokens[0].casefold()
+            return (
+                folded.endswith(cls.PERSON_SURNAME_SUFFIXES)
+                or cls._cue_before_name(name, context, cls.PERSON_CONTEXT_RE)
+                or cls._cue_after_name(name, context, cls.PERSON_CONTEXT_RE)
+            )
+
+        if entity_type == "organization":
+            is_acronym = name.upper() == name and 2 <= len("".join(tokens)) <= 12
+            return (
+                is_acronym
+                or cls._cue_before_name(name, context, cls.ORGANIZATION_CONTEXT_RE)
+                or cls._cue_after_name(name, context, cls.ORGANIZATION_CONTEXT_RE)
+            )
+
+        if entity_type == "location":
+            if (
+                len(tokens) == 1
+                and tokens[0].casefold().endswith("ите")
+                and not ("gliner_multilingual" in votes and score >= 0.80)
+            ):
+                return False
+            if len(tokens) == 1 and re.search(
+                rf"(?i)(?<!\w){re.escape(name)}\s+(село|град|област|регион)\b",
+                context,
+            ):
+                return False
+            return cls._cue_before_name(name, context, cls.LOCATION_CONTEXT_RE)
+
+        return False
+
+    @staticmethod
+    def _name_matches(name: str, context: str):
+        return re.finditer(rf"(?<!\w){re.escape(name)}(?!\w)", context, re.IGNORECASE)
+
+    @classmethod
+    def _cue_before_name(cls, name: str, context: str, cue_pattern) -> bool:
+        for name_match in cls._name_matches(name, context or ""):
+            before = context[max(0, name_match.start() - 80):name_match.start()]
+            cues = list(cue_pattern.finditer(before))
+            if cues and len(re.findall(r"[^\W_]+", before[cues[-1].end():], re.UNICODE)) <= 2:
+                return True
+        return False
+
+    @classmethod
+    def _cue_after_name(cls, name: str, context: str, cue_pattern) -> bool:
+        for name_match in cls._name_matches(name, context or ""):
+            after = context[name_match.end():min(len(context), name_match.end() + 80)]
+            cue = cue_pattern.search(after)
+            if cue and len(re.findall(r"[^\W_]+", after[:cue.start()], re.UNICODE)) <= 2:
+                return True
+        return False
+
+    @classmethod
+    def _contextual_entity_type(
+        cls,
+        name: str,
+        entity_type: str,
+        context: Optional[str],
+    ) -> str:
+        """Correct model labels only when a nearby linguistic cue supports it."""
+        context = context or ""
+        if (
+            cls._cue_before_name(name, context, cls.ORGANIZATION_CONTEXT_RE)
+            or cls._cue_after_name(name, context, cls.ORGANIZATION_CONTEXT_RE)
+        ):
+            return "organization"
+        if cls._cue_before_name(name, context, cls.LOCATION_CONTEXT_RE):
+            return "location"
+        return entity_type
+
+    @classmethod
+    def _resolve_type_conflicts(cls, candidates: list[dict]) -> list[dict]:
+        grouped: dict[str, list[dict]] = {}
+        for candidate in candidates:
+            grouped.setdefault(str(candidate.get("canonical_name", "")), []).append(candidate)
+        resolved = []
+        for variants in grouped.values():
+            if len(variants) == 1:
+                resolved.extend(variants)
+                continue
+            winner = max(variants, key=cls._type_resolution_rank)
+            winner.setdefault("decision_reasons", set()).add("type_conflict_resolved")
+            resolved.append(winner)
+        return resolved
+
+    @classmethod
+    def _type_resolution_rank(cls, candidate: dict) -> tuple:
+        if candidate.get("lexicon"):
+            return (100, 1.0)
+        name = str(candidate.get("name", ""))
+        kind = str(candidate.get("entity_type", ""))
+        context = " ".join(candidate.get("contexts") or [])
+        tokens = re.findall(r"[^\W_]+", name, re.UNICODE)
+        score = 0
+        if kind == "location" and cls._cue_before_name(name, context, cls.LOCATION_CONTEXT_RE):
+            score += 30
+        if kind == "organization" and (
+            cls._cue_before_name(name, context, cls.ORGANIZATION_CONTEXT_RE)
+            or cls._cue_after_name(name, context, cls.ORGANIZATION_CONTEXT_RE)
+        ):
+            score += 30
+        if kind == "person" and len(tokens) >= 2 and all(token[:1].isupper() for token in tokens):
+            score += 20
+        surname_shaped = bool(
+            tokens and tokens[-1].casefold().endswith(cls.PERSON_SURNAME_SUFFIXES)
+        )
+        if kind == "person" and surname_shaped:
+            score += 15
+        if kind == "person" and (
+            cls._cue_before_name(name, context, cls.PERSON_CONTEXT_RE)
+            or cls._cue_after_name(name, context, cls.PERSON_CONTEXT_RE)
+        ):
+            score += 30
+        if kind == "location" and surname_shaped:
+            score -= 20
+        if kind == "organization" and name.upper() == name and any(ch.isalpha() for ch in name):
+            score += 20
+        return (score, cls._candidate_confidence(candidate))
+
+    @staticmethod
+    def _candidate_confidence(candidate: dict) -> float:
+        """Produce an explainable ranking score, never an approval decision."""
+        if candidate.get("lexicon"):
+            return 1.0
+        name = str(candidate.get("name", ""))
+        tokens = name.split()
+        score = max(0.35, float(candidate.get("model_score") or 0.0))
+        score += 0.08 if len(tokens) >= 2 else 0.0
+        score += 0.06 if int(candidate.get("count", 0)) >= 2 else 0.0
+        score += 0.04 if name[:1].isupper() else 0.0
+        score += 0.10 if len(candidate.get("model_votes") or []) >= 2 else 0.0
+        return round(min(score, 0.95), 3)
 
     @classmethod
     def is_explicit_noise(cls, name: str) -> bool:
@@ -429,7 +737,7 @@ class EntityExtractor:
     def _is_covered_by_lexicon(
         canonical: str,
         entity_type: str,
-        raw_entities: dict[str, dict],
+        raw_entities: dict[tuple[str, str], dict],
     ) -> bool:
         for existing_canonical, existing in raw_entities.items():
             if not existing.get("lexicon"):
@@ -445,25 +753,6 @@ class EntityExtractor:
                 ):
                     return True
         return False
-
-    @staticmethod
-    def _split_sentences(text: str) -> list[str]:
-        return [
-            part.strip()
-            for part in re.split(r"(?<=[.!?।])\s+|\n+", text)
-            if part.strip()
-        ]
-
-    @staticmethod
-    def _context_for_span(start: int, end: int, sentences: list[str]) -> Optional[str]:
-        cursor = 0
-        for sentence in sentences:
-            sentence_start = cursor
-            sentence_end = cursor + len(sentence)
-            if start >= sentence_start and end <= sentence_end:
-                return sentence[:300] + ("..." if len(sentence) > 300 else "")
-            cursor = sentence_end + 1
-        return None
 
     def _is_valid_entity(
         self,
@@ -514,7 +803,8 @@ class EntityExtractor:
             "\u0443\u043f\u0440\u0430\u0432\u0430\u0442\u0430",
         }:
             reasons.append("generic_word")
-        if tokens and sum(1 for token in tokens if token in cls.CONNECTOR_WORDS) >= max(1, len(tokens) // 2):
+        connector_count = sum(1 for token in tokens if token in cls.CONNECTOR_WORDS)
+        if connector_count >= 2 and connector_count * 2 >= len(tokens):
             reasons.append("connector_heavy")
 
         stripped = name.strip()
@@ -531,7 +821,10 @@ class EntityExtractor:
 
         if any(pattern.search(canonical) for pattern in cls.SUSPICIOUS_PHRASE_PATTERNS):
             reasons.append("phrase_fragment")
-        if len(folded_tokens & cls.SOCIAL_SHARE_WORDS) >= 2:
+        if (
+            len(folded_tokens & cls.SOCIAL_SHARE_WORDS) >= 2
+            or (folded_tokens and folded_tokens <= cls.SOCIAL_SHARE_WORDS)
+        ):
             reasons.append("social_share_widget")
         if folded in cls.UI_FRAGMENT_WORDS or folded_tokens & cls.UI_FRAGMENT_WORDS:
             reasons.append("ui_fragment")
@@ -563,11 +856,7 @@ class EntityExtractor:
     @staticmethod
     def _canonicalize(name: str) -> str:
         """Normalize entity name for deduplication."""
-        # Lowercase, strip extra whitespace
-        canonical = " ".join(name.lower().split())
-        # Remove common suffixes/prefixes
-        canonical = re.sub(r'\b(mr|mrs|ms|dr|prof|sr|jr)\b\.?\s*', '', canonical)
-        return canonical.strip()
+        return canonicalize(name)
 
     @staticmethod
     def _ascii_fold(value: str) -> str:
@@ -590,49 +879,10 @@ class EntityExtractor:
         return None
 
     @staticmethod
-    def _merge_similar(entities: dict[str, dict]) -> dict[str, dict]:
+    def _merge_similar(entities: dict) -> dict:
+        """Keep candidates separate unless the curated registry resolved them.
+
+        Substring merging is unsafe for shared surnames and names embedded in
+        organizations. Duplicate suggestions belong in review, not extraction.
         """
-        Merge entities that are likely the same
-        (e.g., 'Biden' and 'Joe Biden').
-        """
-        keys = sorted(entities.keys(), key=len, reverse=True)
-        merged_into: dict[str, str] = {}  # short_key → long_key
-
-        for i, long_key in enumerate(keys):
-            for short_key in keys[i + 1:]:
-                if short_key in merged_into:
-                    continue
-
-                # Check if short name is a substring of long name
-                # and they share the same entity type
-                long_ent = entities[long_key]
-                short_ent = entities[short_key]
-
-                if long_ent["entity_type"] != short_ent["entity_type"]:
-                    continue
-
-                if short_key in long_key:
-                    # Merge short into long
-                    long_ent["count"] += short_ent["count"]
-                    long_ent["contexts"].extend(short_ent["contexts"])
-                    long_ent["contexts"] = long_ent["contexts"][:3]
-                    long_ent.setdefault("provenance", set()).update(
-                        short_ent.get("provenance") or set()
-                    )
-                    long_ent.setdefault("matched_aliases", set()).update(
-                        short_ent.get("matched_aliases") or set()
-                    )
-                    long_ent["confidence"] = max(
-                        float(long_ent.get("confidence", 0.0)),
-                        float(short_ent.get("confidence", 0.0)),
-                    )
-                    long_ent["publishable"] = bool(
-                        long_ent.get("publishable") or short_ent.get("publishable")
-                    )
-                    merged_into[short_key] = long_key
-
-        # Remove merged entities
-        for key in merged_into:
-            entities.pop(key, None)
-
         return entities

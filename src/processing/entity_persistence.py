@@ -65,6 +65,21 @@ def get_or_create_extracted_entity(session: Session, extracted) -> Entity:
         float(metadata.get("confidence") or 0.0),
         float(extracted.confidence),
     )
+    existing_reasons = metadata.get("decision_reasons", [])
+    if isinstance(existing_reasons, str):
+        existing_reasons = [existing_reasons]
+    metadata["decision_reasons"] = sorted({
+        str(value)
+        for value in [*existing_reasons, *getattr(extracted, "decision_reasons", [])]
+        if value
+    })
+    metadata["evidence_count"] = max(
+        int(metadata.get("evidence_count") or 0),
+        int(getattr(extracted, "evidence_count", 1)),
+    )
+    metadata["trust_tier"] = (
+        "curated" if extracted.publishable else "candidate_requires_review"
+    )
     metadata["publishable"] = entity.status == EntityStatus.APPROVED
     entity.metadata_json = metadata
     entity.search_text = search_blob(

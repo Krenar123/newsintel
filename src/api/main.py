@@ -54,7 +54,7 @@ from src.models.database import (
     ChatConversation, ChatMessage,
 )
 from src.search.engine import SearchEngine, SearchFilters
-from src.search.normalization import search_variants
+from src.search.normalization import search_blob, search_variants
 from src.search.predicates import (
     article_text_match,
     client_publishable_entity_filter,
@@ -102,6 +102,7 @@ from src.api.schemas import (
 from src.processing.entities import (
     corrected_entity_type, is_likely_entity_name, EntityExtractor,
 )
+from src.processing.entity_registry import EntityRegistry, alias_value
 from src.processing.story_clustering import StoryClusterer
 from src.processing.risk_scoring import PoliticalRiskScorer
 from src.processing.attack_analysis import analyze_attack_text, detect_attack_categories
@@ -350,6 +351,9 @@ def _entity_to_response(entity: Entity) -> EntityResponse:
         confidence=metadata.get("confidence"),
         publishable=is_client_publishable_entity(entity),
         matched_aliases=matched_aliases,
+        decision_reasons=metadata.get("decision_reasons", []),
+        evidence_count=int(metadata.get("evidence_count") or 0),
+        trust_tier=str(metadata.get("trust_tier") or "legacy"),
         total_mentions=entity.total_mentions,
         first_seen_at=entity.first_seen_at,
         last_seen_at=entity.last_seen_at,
@@ -1000,23 +1004,92 @@ def update_entity_review(
     entity_id: int,
     request: EntityReviewUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_staff),
+    reviewer: User = Depends(require_staff),
 ):
     """Approve, hide, rename, or correct the type of an entity."""
     entity = db.query(Entity).get(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
-    if request.name is not None and request.name.strip():
-        entity.name = request.name.strip()
-        entity.canonical_name = EntityExtractor._canonicalize(entity.name)
-    if request.entity_type is not None:
-        entity.entity_type = EntityType(request.entity_type)
+    before = {
+        "name": entity.name,
+        "canonical_name": entity.canonical_name,
+        "entity_type": entity.entity_type.value,
+        "status": entity.status.value,
+        "review_notes": entity.review_notes,
+    }
+    desired_name = (
+        request.name.strip()
+        if request.name is not None and request.name.strip()
+        else entity.name
+    )
+    desired_canonical = EntityExtractor._canonicalize(desired_name)
+    desired_type = (
+        EntityType(request.entity_type)
+        if request.entity_type is not None
+        else entity.entity_type
+    )
+    conflict = (
+        db.query(Entity)
+        .filter(
+            Entity.id != entity.id,
+            Entity.canonical_name == desired_canonical,
+            Entity.entity_type == desired_type,
+        )
+        .first()
+    )
+    if conflict:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Entity conflicts with #{conflict.id} {conflict.name!r}; "
+                "merge the records instead of creating a duplicate identity."
+            ),
+        )
+    entity.name = desired_name
+    entity.canonical_name = desired_canonical
+    entity.entity_type = desired_type
     if request.status is not None:
         entity.status = EntityStatus(request.status)
         entity.reviewed_at = datetime.datetime.utcnow()
     if request.review_notes is not None:
         entity.review_notes = request.review_notes
+
+    metadata = dict(entity.metadata_json or {})
+    metadata["publishable"] = entity.status == EntityStatus.APPROVED
+    metadata["trust_tier"] = (
+        "human_reviewed" if entity.status == EntityStatus.APPROVED
+        else "rejected" if entity.status == EntityStatus.HIDDEN
+        else "candidate_requires_review"
+    )
+    metadata["reviewed_by_user_id"] = reviewer.id
+    metadata["reviewed_by_email"] = reviewer.email
+    metadata["reviewed_at"] = (
+        entity.reviewed_at.isoformat() if entity.reviewed_at else None
+    )
+    history = metadata.get("review_history") or []
+    if not isinstance(history, list):
+        history = []
+    history.append({
+        "reviewed_at": metadata["reviewed_at"] or datetime.datetime.utcnow().isoformat(),
+        "reviewer_user_id": reviewer.id,
+        "reviewer_email": reviewer.email,
+        "before": before,
+        "after": {
+            "name": entity.name,
+            "canonical_name": entity.canonical_name,
+            "entity_type": entity.entity_type.value,
+            "status": entity.status.value,
+            "review_notes": entity.review_notes,
+        },
+    })
+    metadata["review_history"] = history[-100:]
+    entity.metadata_json = metadata
+    entity.search_text = search_blob(
+        entity.name,
+        entity.canonical_name,
+        *(metadata.get("aliases") or []),
+    )
 
     db.commit()
     db.refresh(entity)
@@ -1096,6 +1169,10 @@ def entity_quality_report(
                 "status": entity.status.value,
                 "total_mentions": entity.total_mentions,
                 "reasons": reasons,
+                "candidate_score": (entity.metadata_json or {}).get("confidence"),
+                "decision_reasons": (entity.metadata_json or {}).get("decision_reasons", []),
+                "evidence_count": int((entity.metadata_json or {}).get("evidence_count") or 0),
+                "trust_tier": (entity.metadata_json or {}).get("trust_tier", "legacy"),
             })
     return {
         "checked": len(candidates),
@@ -1210,7 +1287,11 @@ def entity_lexicon_coverage(
         name = str(item.get("name", "")).strip()
         if not name:
             continue
-        aliases = [str(alias).strip() for alias in item.get("aliases", []) if str(alias).strip()]
+        aliases = [
+            alias_value(alias)
+            for alias in item.get("aliases", [])
+            if alias_value(alias)
+        ]
         canonicals = {EntityExtractor._canonicalize(name)}
         canonicals.update(EntityExtractor._canonicalize(alias) for alias in aliases)
         known_canonicals.update(canonicals)
@@ -1323,7 +1404,11 @@ def add_entity_to_lexicon(
     canonical_candidates.update(EntityExtractor._canonicalize(alias) for alias in aliases)
     for item in data.get("entities", []):
         existing = {EntityExtractor._canonicalize(str(item.get("name", "")))}
-        existing.update(EntityExtractor._canonicalize(str(alias)) for alias in item.get("aliases", []) or [])
+        existing.update(
+            EntityExtractor._canonicalize(alias_value(alias))
+            for alias in item.get("aliases", []) or []
+            if alias_value(alias)
+        )
         if canonical_candidates & existing:
             return {
                 "status": "already_exists",
@@ -1346,6 +1431,10 @@ def add_entity_to_lexicon(
     if aliases:
         item["aliases"] = aliases
     data["entities"].append(item)
+    try:
+        EntityRegistry.from_data(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     path.write_text(
         yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=120),
         encoding="utf-8",
@@ -1355,6 +1444,25 @@ def add_entity_to_lexicon(
         entity.status = EntityStatus.APPROVED
         entity.review_notes = "Added to curated country entity lexicon."
         entity.reviewed_at = datetime.datetime.utcnow()
+        metadata = dict(entity.metadata_json or {})
+        provenance = metadata.get("provenance") or []
+        if isinstance(provenance, str):
+            provenance = [provenance]
+        metadata.update({
+            "aliases": aliases,
+            "matched_aliases": aliases,
+            "curated_country": country_code,
+            "provenance": sorted({
+                *provenance,
+                "curated_lexicon",
+            }),
+            "confidence": 1.0,
+            "publishable": True,
+            "trust_tier": "curated",
+            "decision_reasons": ["validated_registry_alias"],
+        })
+        entity.metadata_json = metadata
+        entity.search_text = search_blob(name, entity.canonical_name, *aliases)
         db.commit()
 
     return {
@@ -1413,7 +1521,7 @@ def merge_lexicon_alias_entities(
             continue
         target_canonical = EntityExtractor._canonicalize(target_name)
         for alias in item.get("aliases", []) or []:
-            alias_canonical = EntityExtractor._canonicalize(str(alias).strip())
+            alias_canonical = EntityExtractor._canonicalize(alias_value(alias))
             if alias_canonical and alias_canonical != target_canonical:
                 alias_to_target[alias_canonical] = target_canonical
     alias_to_target.update({

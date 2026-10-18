@@ -137,3 +137,72 @@ def test_explicit_noise_list_is_narrow_and_deterministic():
     assert EntityExtractor.is_explicit_noise("Një")
     assert EntityExtractor.is_explicit_noise("Flaka Media")
     assert not EntityExtractor.is_explicit_noise("Христијан Мицкоски")
+
+
+class _FakeGliner:
+    def __init__(self, predictions):
+        self.predictions = predictions
+
+    def predict_entities(self, _text, _labels, threshold):
+        assert threshold > 0
+        return self.predictions
+
+
+def test_multimodel_agreement_ranks_candidate_without_publishing_it():
+    extractor = _controlled_extractor([{"label": "PER", "pattern": "John Example"}])
+    extractor._gliner = _FakeGliner([{
+        "text": "John Example",
+        "label": "person",
+        "score": 0.82,
+        "start": 0,
+        "end": 12,
+    }])
+
+    result = extractor.extract("John Example spoke to reporters today.", language="en")
+    entity = next(item for item in result.entities if item.name == "John Example")
+
+    assert entity.publishable is False
+    assert entity.mention_count == 1
+    assert entity.provenance == ["gliner_multilingual", "spacy_ner"]
+    assert "multi_model_agreement" in entity.decision_reasons
+    assert entity.confidence >= 0.9
+
+
+def test_same_surface_with_different_model_types_stays_separate_for_review():
+    extractor = _controlled_extractor([{"label": "ORG", "pattern": "Nova"}])
+    extractor._gliner = _FakeGliner([{
+        "text": "Nova",
+        "label": "person",
+        "score": 0.8,
+        "start": 0,
+        "end": 4,
+    }])
+
+    result = extractor.extract("Nova company appeared in the report today.", language="en")
+
+    assert {(item.name, item.entity_type) for item in result.entities} == {
+        ("Nova", "organization")
+    }
+    entity = result.entities[0]
+    assert entity.provenance == ["gliner_multilingual", "spacy_ner"]
+    assert "multi_model_agreement" in entity.decision_reasons
+    assert entity.publishable is False
+
+
+def test_sentence_start_nouns_do_not_pollute_review_candidates():
+    extractor = _controlled_extractor([
+        {"label": "PER", "pattern": "Зошто"},
+        {"label": "PER", "pattern": "Вратите"},
+        {"label": "ORG", "pattern": "Почетната"},
+        {"label": "PER", "pattern": "Ивица Томовски"},
+    ])
+
+    result = extractor.extract(
+        "Зошто објектот не работи? Вратите се затворени. "
+        "Почетната цена е објавена. Директорот Ивица Томовски изјави дека ќе одговори.",
+        language="mk",
+    )
+
+    assert {(item.name, item.entity_type) for item in result.entities} == {
+        ("Ивица Томовски", "person")
+    }

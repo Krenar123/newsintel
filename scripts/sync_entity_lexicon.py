@@ -24,6 +24,7 @@ from src.models.database import (
     get_session_factory,
 )
 from src.processing.entities import EntityExtractor
+from src.processing.entity_registry import alias_value
 from src.search.normalization import search_blob
 
 
@@ -102,8 +103,9 @@ def main() -> int:
     collisions = []
     for item in items:
         owner = EntityExtractor._canonicalize(str(item.get("name", "")))
-        for value in [item.get("name", ""), *(item.get("aliases", []) or [])]:
-            alias = EntityExtractor._canonicalize(str(value))
+        for raw_value in [item.get("name", ""), *(item.get("aliases", []) or [])]:
+            value = alias_value(raw_value)
+            alias = EntityExtractor._canonicalize(value)
             if alias in owner_by_alias and owner_by_alias[alias] != owner:
                 collisions.append((alias, owner_by_alias[alias], owner))
             owner_by_alias[alias] = owner
@@ -130,7 +132,11 @@ def main() -> int:
         for item in items:
             name = str(item.get("name", "")).strip()
             entity_type = EntityType(str(item.get("type", "")))
-            aliases = [str(value).strip() for value in item.get("aliases", []) or [] if str(value).strip()]
+            aliases = [
+                alias_value(value)
+                for value in item.get("aliases", []) or []
+                if alias_value(value)
+            ]
             canonical = EntityExtractor._canonicalize(name)
             candidates = {canonical, *(EntityExtractor._canonicalize(value) for value in aliases)}
             matches = (
@@ -188,6 +194,8 @@ def main() -> int:
                         "provenance": ["curated_lexicon"],
                         "confidence": 1.0,
                         "publishable": True,
+                        "trust_tier": "curated",
+                        "decision_reasons": ["validated_registry_alias"],
                     },
                     review_notes="Created from curated country entity lexicon.",
                     reviewed_at=now,
@@ -213,6 +221,8 @@ def main() -> int:
                     "provenance": sorted({*provenance, "curated_lexicon"}),
                     "confidence": 1.0,
                     "publishable": True,
+                    "trust_tier": "curated",
+                    "decision_reasons": ["validated_registry_alias"],
                 })
                 target.metadata_json = metadata
                 target.status = EntityStatus.APPROVED

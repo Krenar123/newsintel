@@ -92,6 +92,9 @@ class EntityResponse(BaseModel):
     confidence: Optional[float] = None
     publishable: bool = False
     matched_aliases: list[str] = Field(default_factory=list)
+    decision_reasons: list[str] = Field(default_factory=list)
+    evidence_count: int = 0
+    trust_tier: str = "unknown"
     total_mentions: int
     first_seen_at: datetime.datetime
     last_seen_at: datetime.datetime

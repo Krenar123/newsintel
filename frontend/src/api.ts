@@ -62,6 +62,13 @@ export type Entity = {
   entity_type: string;
   status: string;
   review_notes?: string | null;
+  provenance?: string[];
+  confidence?: number | null;
+  publishable?: boolean;
+  matched_aliases?: string[];
+  decision_reasons?: string[];
+  evidence_count?: number;
+  trust_tier?: string;
   total_mentions: number;
   first_seen_at: string;
   last_seen_at: string;
@@ -97,6 +104,10 @@ export type EntityQualityReport = {
     status: string;
     total_mentions: number;
     reasons: string[];
+    candidate_score?: number | null;
+    decision_reasons?: string[];
+    evidence_count?: number;
+    trust_tier?: string;
   }>;
 };
 

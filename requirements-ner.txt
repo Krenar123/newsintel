@@ -1,0 +1,4 @@
+# Optional production entity discovery stack.
+# Install only on an ingestion worker with enough RAM/disk for local inference.
+-r requirements.txt
+gliner==0.2.28

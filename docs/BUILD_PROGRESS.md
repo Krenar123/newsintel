@@ -727,6 +727,32 @@ This is the authoritative checkpoint for the current production-readiness pass.
 - Cross-client dashboard access: HTTP 403
 - Cold dashboard target below three seconds: passed for all eight configured clients
 
+### Production Entity Quality Upgrade (2026-10-18)
+
+- Added a validated Unicode-aware entity registry with collision detection,
+  word-boundary matching, longest-alias resolution, punctuation/dash tolerance,
+  short-acronym case sensitivity, and optional context guards.
+- Removed unsafe substring entity merging; shared surnames and names embedded
+  in organizations now stay separate until explicit review.
+- Added type-aware candidate identities so the same surface form can be reviewed
+  as different entity types without one overwriting the other.
+- Added optional local GLiNER multilingual discovery alongside spaCy. Ensemble
+  agreement raises review priority but never bypasses the APPROVED firewall.
+- Added exact-span deduplication so two models cannot inflate mention counts.
+- Added provenance, decision reasons, evidence count, trust tier, reviewer
+  identity, and review timestamp to the entity audit trail.
+- Added source-stratified article annotation export with deterministic
+  calibration/holdout splits and a production evaluator with confidence bounds.
+- Current automated verification: 80 registry entities, 291 aliases, zero
+  collisions, 35/35 acceptance cases, 19 focused entity tests, and 100%
+  precision/recall on the compact regression fixture.
+- Production certification remains intentionally pending until at least 100
+  blinded holdout articles across 10 sources are human-labelled and pass the
+  release gate. Ingestion remains stopped by owner request.
+- Final verification for this build: 40/40 Python tests, 19 focused entity
+  tests, 35/35 entity acceptance cases, valid frontend production build, and
+  successful read-only annotation export from the current SQLite dataset.
+
 ### External Activation Gates
 
 These cannot be honestly completed without owner-supplied external credentials or

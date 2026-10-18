@@ -3,6 +3,7 @@
 
 import argparse
 import importlib.util
+import json
 import os
 import sys
 from pathlib import Path
@@ -43,7 +44,7 @@ def main() -> int:
     validate_ingestion(findings)
     validate_email(findings)
     validate_paths(findings)
-    validate_optional_integrations(findings)
+    validate_optional_integrations(findings, production)
 
     print_report(findings)
     has_errors = any(item["level"] == "error" for item in findings)
@@ -165,7 +166,7 @@ def validate_paths(findings: list[dict]) -> None:
             add(findings, "error", code, f"{path} does not exist.")
 
 
-def validate_optional_integrations(findings: list[dict]) -> None:
+def validate_optional_integrations(findings: list[dict], production: bool) -> None:
     ai_enabled = settings.enable_ai_summaries or settings.enable_ai_intelligence
     ai_key = settings.ai_api_key or settings.anthropic_api_key
     if ai_enabled and not ai_key:
@@ -191,6 +192,47 @@ def validate_optional_integrations(findings: list[dict]) -> None:
         )
     else:
         add(findings, "info", "ai_disabled", "Production AI intelligence is disabled.")
+
+    if settings.enable_gliner_ner:
+        if importlib.util.find_spec("gliner") is None:
+            add(
+                findings,
+                "error",
+                "gliner_missing",
+                "ENABLE_GLINER_NER=true requires requirements-ner.txt.",
+            )
+        elif not 0.0 < settings.gliner_threshold < 1.0:
+            add(findings, "error", "gliner_threshold", "GLINER_THRESHOLD must be between 0 and 1.")
+        else:
+            add(
+                findings,
+                "ok",
+                "gliner_configured",
+                f"GLiNER {settings.gliner_model} is enabled at {settings.gliner_threshold:.2f}.",
+            )
+    else:
+        add(findings, "info", "gliner_disabled", "Optional GLiNER entity discovery is disabled.")
+
+    entity_report_path = settings.base_dir / "data" / "entity_annotations" / "latest_quality_report.json"
+    if entity_report_path.exists():
+        try:
+            entity_report = json.loads(entity_report_path.read_text(encoding="utf-8"))
+            gate_passed = bool((entity_report.get("production_gate") or {}).get("passed"))
+            add(
+                findings,
+                "ok" if gate_passed else "error",
+                "entity_holdout_gate",
+                "Blinded entity holdout passed." if gate_passed else "Latest entity holdout did not pass.",
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            add(findings, "error", "entity_holdout_report", f"Cannot read entity holdout report: {exc}")
+    elif production:
+        add(
+            findings,
+            "warning",
+            "entity_holdout_missing",
+            "No blinded entity holdout report exists at data/entity_annotations/latest_quality_report.json.",
+        )
 
     if settings.facebook_access_token:
         add(findings, "info", "facebook_configured", "Facebook token is present, but social ingestion is parked for now.")

@@ -9,8 +9,8 @@ data and remains green in regression testing.
 
 | Area | 9/10 gate | Measurement |
 | --- | --- | --- |
-| Entity publication | >= 99% precision and >= 90% recall for tracked entities | Versioned, human-labelled MK/SQ fixture set |
-| Entity discovery | >= 98% precision before review | Entity evaluator |
+| Entity publication | >= 99.5% precision, >= 97% recall, and >= 98% Wilson lower precision bound | Blinded, human-labelled MK/SQ real-article holdout |
+| Entity discovery | >= 95% precision and recall before review | Real-article entity evaluator |
 | Entity trust | 100% of client-visible entities are APPROVED | API/query regression tests |
 | Alias resolution | >= 98% of tested Cyrillic, Latin, Albanian and inflected aliases resolve to one canonical entity | Alias fixture suite |
 | Duplicate control | < 2% duplicate leakage in a weekly reviewed sample | Ingestion quality report |
@@ -35,17 +35,26 @@ data and remains green in regression testing.
   unknown name remains discoverable without being represented as a trusted
   structured entity.
 
-Curated lexicon matches have confidence 1.0, provenance curated_lexicon, and
-are approved. spaCy model discoveries use a conservative non-calibrated
-confidence, provenance spacy_ner, and enter NEEDS_REVIEW.
+Validated registry matches have confidence 1.0, provenance curated_lexicon,
+and are approved. spaCy and optional GLiNER discoveries receive explainable
+candidate-ranking scores and enter NEEDS_REVIEW. Model agreement improves
+review priority but never publishes an entity.
 
 ## Evaluation Commands
 
 Run:
 
+    .\venv\Scripts\python.exe scripts\validate_entity_registry.py
     .\venv\Scripts\python.exe scripts\evaluate_entities.py
-    .\venv\Scripts\python.exe -m pytest tests\test_entity_quality.py -q
+    .\venv\Scripts\python.exe -m pytest tests\test_entity_quality.py tests\test_entity_registry.py -q
     .\venv\Scripts\python.exe scripts\sync_entity_lexicon.py --country mk --transition-auto
+
+For a real production claim, label a source-stratified article batch and run:
+
+    .\venv\Scripts\python.exe scripts\export_entity_annotation_batch.py --limit 1000
+    .\venv\Scripts\python.exe scripts\evaluate_entity_annotations.py <batch.jsonl> --split holdout --production
+
+See `docs/ENTITY_QUALITY_PRODUCTION.md` for the annotation contract and gates.
 
 The final command is a dry run. Apply only after reviewing its counts:
 
